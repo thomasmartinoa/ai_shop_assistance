@@ -5,8 +5,8 @@ export const APP_VERSION = '0.1.0';
 
 // Voice settings
 export const VOICE_SETTINGS = {
-  lang: 'en-IN', // English India (better browser support)
-  malayalamLang: 'ml-IN', // Malayalam (for future use)
+  lang: 'ml-IN', // Malayalam - primary language
+  fallbackLang: 'en-IN', // English India fallback
   continuous: true, // Keep listening until manually stopped
   interimResults: true,
   maxAlternatives: 3,

@@ -158,33 +158,51 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('🎤 Error:', event.error);
-      isListeningRef.current = false;
       
-      // Only show error for actual errors, not "no-speech" or "aborted"
-      if (event.error !== 'no-speech' && event.error !== 'aborted') {
-        setState('error');
-        onErrorRef.current?.(event.error);
-        setTimeout(() => setState('idle'), 2000);
-      } else {
-        setState('idle');
+      // For no-speech, just restart if we're supposed to be listening
+      if (event.error === 'no-speech') {
+        console.log('🎤 No speech detected, restarting...');
+        if (stateRef.current === 'listening') {
+          setTimeout(() => {
+            try {
+              recognition.start();
+            } catch (e) {
+              console.log('🎤 Could not restart after no-speech');
+            }
+          }, 100);
+        }
+        return;
       }
+      
+      // For aborted, just ignore
+      if (event.error === 'aborted') {
+        return;
+      }
+      
+      // For real errors, show error state
+      isListeningRef.current = false;
+      setState('error');
+      onErrorRef.current?.(event.error);
+      setTimeout(() => setState('idle'), 2000);
     };
 
     recognition.onend = () => {
-      console.log('🎤 Recognition ended');
-      isListeningRef.current = false;
+      console.log('🎤 Recognition ended, state:', stateRef.current);
       
-      // If we were still supposed to be listening (continuous mode), restart
-      if (stateRef.current === 'listening' && continuous) {
-        console.log('🎤 Restarting for continuous mode...');
-        try {
-          recognition.start();
-        } catch (e) {
-          console.log('🎤 Could not restart:', e);
-          setState('idle');
-        }
+      // Always restart if we're supposed to be listening
+      if (stateRef.current === 'listening') {
+        console.log('🎤 Restarting to keep listening...');
+        setTimeout(() => {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.log('🎤 Could not restart:', e);
+            isListeningRef.current = false;
+            setState('idle');
+          }
+        }, 100);
       } else {
-        setState('idle');
+        isListeningRef.current = false;
       }
     };
 
