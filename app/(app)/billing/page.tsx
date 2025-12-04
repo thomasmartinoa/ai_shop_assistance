@@ -167,8 +167,7 @@ export default function BillingPage() {
         <CardContent className="p-6 flex flex-col items-center">
           <VoiceButton
             state={voice.state}
-            onPress={voice.startListening}
-            onRelease={voice.stopListening}
+            onToggle={voice.toggleListening}
             disabled={!voice.isSupported}
           />
           

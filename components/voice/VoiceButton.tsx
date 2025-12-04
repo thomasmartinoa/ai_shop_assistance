@@ -6,16 +6,14 @@ import type { VoiceState } from '@/hooks/useVoice';
 
 interface VoiceButtonProps {
   state: VoiceState;
-  onPress: () => void;
-  onRelease: () => void;
+  onToggle: () => void;
   disabled?: boolean;
   className?: string;
 }
 
 export function VoiceButton({
   state,
-  onPress,
-  onRelease,
+  onToggle,
   disabled = false,
   className,
 }: VoiceButtonProps) {
@@ -36,9 +34,9 @@ export function VoiceButton({
     if (isProcessing) return 'Processing...';
     if (isSpeaking) return 'Speaking...';
     if (isError) return 'Error';
-    if (isActive) return 'Listening...';
+    if (isActive) return 'Tap to stop';
     if (disabled) return 'Voice not available';
-    return 'Hold to speak';
+    return 'Tap to speak';
   };
 
   const getColor = () => {
@@ -54,17 +52,7 @@ export function VoiceButton({
       <button
         type="button"
         disabled={disabled || isProcessing || isSpeaking}
-        onMouseDown={onPress}
-        onMouseUp={onRelease}
-        onMouseLeave={onRelease}
-        onTouchStart={(e) => {
-          e.preventDefault();
-          onPress();
-        }}
-        onTouchEnd={(e) => {
-          e.preventDefault();
-          onRelease();
-        }}
+        onClick={onToggle}
         className={cn(
           'relative w-24 h-24 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-lg',
           getColor(),

@@ -36,13 +36,17 @@ export function VoiceVisualizer({
       </div>
 
       {/* Transcript display */}
-      {transcript && (
-        <div className="bg-muted rounded-lg p-3 max-w-md w-full">
-          <p className="text-sm text-center italic text-muted-foreground">
+      <div className="bg-muted rounded-lg p-3 max-w-md w-full min-h-[60px]">
+        {transcript ? (
+          <p className="text-sm text-center italic text-foreground">
             "{transcript}"
           </p>
-        </div>
-      )}
+        ) : (
+          <p className="text-sm text-center text-muted-foreground">
+            {state === 'listening' ? 'Listening... speak now' : 'Tap mic and speak'}
+          </p>
+        )}
+      </div>
 
       {/* State indicator */}
       <div className="flex items-center gap-2">
@@ -57,7 +61,7 @@ export function VoiceVisualizer({
           )}
         />
         <span className="text-xs text-muted-foreground capitalize">
-          {state}
+          {state === 'idle' ? 'Ready' : state}
         </span>
       </div>
     </div>
