@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils';
 import { useProducts } from '@/hooks/useProducts';
 import { useAuth } from '@/contexts/AuthContext';
+import { useVoice } from '@/hooks/useVoice';
+import { useSmartNLP } from '@/lib/nlp/useSmartNLP';
+import { VoiceButton } from '@/components/voice/VoiceButton';
+import { VoiceVisualizer } from '@/components/voice/VoiceVisualizer';
 import {
   Plus,
   Search,
@@ -16,14 +20,17 @@ import {
   Trash2,
   Grid,
   List,
+  Mic,
 } from 'lucide-react';
 
 export default function InventoryPage() {
   const { shop } = useAuth();
-  const { products, loadProducts, getLowStockProducts, addProduct } = useProducts({ shopId: shop?.id });
+  const { products, loadProducts, getLowStockProducts, addProduct, updateStock, findProduct } = useProducts({ shopId: shop?.id });
+  const { processText, lastResult } = useSmartNLP();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<string>('');
   const [newProduct, setNewProduct] = useState({
     name_en: '',
     name_ml: '',
@@ -32,6 +39,75 @@ export default function InventoryPage() {
     stock: '',
     min_stock: '10',
     gst_rate: '0',
+  });
+
+  // Handle voice commands for inventory
+  const handleVoiceResult = useCallback(
+    async (transcript: string, isFinal: boolean) => {
+      if (!isFinal) return;
+
+      const result = await processText(transcript);
+      
+      switch (result.intent) {
+        case 'inventory.add':
+          const productName = result.entities.product;
+          const quantity = result.entities.quantity || 10;
+          
+          if (productName) {
+            const existingProduct = findProduct(productName);
+            if (existingProduct) {
+              // Update existing product stock
+              await updateStock(existingProduct.id, existingProduct.stock + quantity);
+              voice.speak(`${existingProduct.name_ml} സ്റ്റോക്കിൽ ${quantity} ${existingProduct.unit} ചേർത്തു`);
+              setVoiceStatus(`Added ${quantity} ${existingProduct.unit} to ${existingProduct.name_en}`);
+            } else {
+              // Prompt to add new product
+              voice.speak(`${productName} ലിസ്റ്റിൽ ഇല്ല. പുതിയ ഉൽപ്പന്നമായി ചേർക്കണോ?`);
+              setVoiceStatus(`Product "${productName}" not found. Say "add new product" to create.`);
+            }
+          } else {
+            voice.speak('ഉൽപ്പന്നത്തിൻ്റെ പേര് പറയൂ');
+          }
+          break;
+
+        case 'inventory.check':
+          const checkProduct = result.entities.product;
+          if (checkProduct) {
+            const product = findProduct(checkProduct);
+            if (product) {
+              voice.speak(`${product.name_ml} ${product.stock} ${product.unit} ഉണ്ട്`);
+              setVoiceStatus(`${product.name_en}: ${product.stock} ${product.unit} in stock`);
+            } else {
+              voice.speak(`${checkProduct} കണ്ടെത്തിയില്ല`);
+            }
+          } else {
+            // Show all low stock
+            const lowStock = getLowStockProducts();
+            if (lowStock.length > 0) {
+              const names = lowStock.map(p => p.name_ml).join(', ');
+              voice.speak(`${lowStock.length} ഉൽപ്പന്നങ്ങൾ സ്റ്റോക്ക് കുറവാണ്: ${names}`);
+              setVoiceStatus(`Low stock: ${lowStock.map(p => p.name_en).join(', ')}`);
+            } else {
+              voice.speak('എല്ലാ ഉൽപ്പന്നങ്ങളും സ്റ്റോക്കിൽ ഉണ്ട്');
+              setVoiceStatus('All products in stock');
+            }
+          }
+          break;
+
+        case 'general.help':
+          voice.speak('സ്റ്റോക്ക് ചേർക്കാൻ: "50 കിലോ അരി സ്റ്റോക്കിൽ ചേർക്കുക". സ്റ്റോക്ക് നോക്കാൻ: "അരി എത്ര ഉണ്ട്"');
+          break;
+
+        default:
+          voice.speak('മനസ്സിലായില്ല. വീണ്ടും പറയൂ.');
+      }
+    },
+    [processText, findProduct, updateStock, getLowStockProducts]
+  );
+
+  const voice = useVoice({
+    onResult: handleVoiceResult,
+    onError: (error) => console.error('Voice error:', error),
   });
 
   // Load products on mount
@@ -86,6 +162,30 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
+      {/* Voice Control Section */}
+      <Card>
+        <CardContent className="p-4 flex items-center gap-4">
+          <VoiceButton
+            state={voice.state}
+            onToggle={voice.toggleListening}
+            disabled={!voice.isSupported}
+          />
+          <div className="flex-1">
+            <VoiceVisualizer
+              state={voice.state}
+              transcript={voice.interimTranscript || voice.transcript}
+              className="text-sm"
+            />
+            {voiceStatus && (
+              <p className="text-xs text-muted-foreground mt-1">{voiceStatus}</p>
+            )}
+          </div>
+          {lastResult && process.env.NODE_ENV === 'development' && (
+            <span className="text-xs text-blue-500">[{lastResult.source}]</span>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

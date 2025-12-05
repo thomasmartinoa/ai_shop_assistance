@@ -3,14 +3,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useVoice } from '@/hooks/useVoice';
 import { useProducts } from '@/hooks/useProducts';
+import { useSmartNLP, type NLPResult } from '@/lib/nlp/useSmartNLP';
 import { VoiceButton } from '@/components/voice/VoiceButton';
 import { VoiceVisualizer } from '@/components/voice/VoiceVisualizer';
 import { UpiQrCode } from '@/components/billing/UpiQrCode';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { classifyIntent, type Intent } from '@/lib/nlp/intent';
 import { formatCurrency } from '@/lib/utils';
-import { INTENT_TYPES, ML_RESPONSES } from '@/lib/constants';
+import { ML_RESPONSES } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Trash2,
@@ -37,8 +37,8 @@ interface CartItem {
 export default function BillingPage() {
   const { shop } = useAuth();
   const { findProduct, loadProducts } = useProducts({ shopId: shop?.id });
+  const { processText, isProcessing, lastResult } = useSmartNLP();
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [lastIntent, setLastIntent] = useState<Intent | null>(null);
   const [showQR, setShowQR] = useState(false);
   const [paymentComplete, setPaymentComplete] = useState(false);
 
@@ -55,19 +55,19 @@ export default function BillingPage() {
   );
   const total = subtotal + gstAmount;
 
-  // Handle voice result
+  // Handle voice result with Smart NLP
   const handleVoiceResult = useCallback(
-    (transcript: string, isFinal: boolean) => {
+    async (transcript: string, isFinal: boolean) => {
       if (!isFinal) return;
 
-      const intent = classifyIntent(transcript);
-      setLastIntent(intent);
+      // Process through Smart NLP (Dialogflow + local fallback)
+      const result = await processText(transcript);
 
-      // Process intent
-      switch (intent.type) {
-        case INTENT_TYPES.BILLING_ADD:
-          const productName = intent.entities.productName as string;
-          const quantity = (intent.entities.quantity as number) || 1;
+      // Process based on intent
+      switch (result.intent) {
+        case 'billing.add':
+          const productName = result.entities.product;
+          const quantity = result.entities.quantity || 1;
           
           if (productName) {
             // Search for product in database
@@ -90,11 +90,13 @@ export default function BillingPage() {
             } else {
               voice.speak(`${productName} കണ്ടെത്തിയില്ല`);
             }
+          } else {
+            voice.speak('ഉൽപ്പന്നത്തിൻ്റെ പേര് പറയൂ');
           }
           break;
 
-        case INTENT_TYPES.BILLING_REMOVE:
-          const removeProduct = intent.entities.productName as string;
+        case 'billing.remove':
+          const removeProduct = result.entities.product;
           if (removeProduct) {
             setCart((prev) =>
               prev.filter(
@@ -106,33 +108,41 @@ export default function BillingPage() {
           }
           break;
 
-        case INTENT_TYPES.BILLING_CLEAR:
+        case 'billing.clear':
           setCart([]);
           voice.speak('ബിൽ ക്ലിയർ ചെയ്തു');
           break;
 
-        case INTENT_TYPES.BILL_TOTAL:
+        case 'billing.total':
           voice.speak(`ആകെ തുക ${Math.round(total)} രൂപ`);
           break;
 
-        case INTENT_TYPES.PAYMENT_UPI:
+        case 'payment.upi':
           setShowQR(true);
           voice.speak('QR കോഡ് കാണിക്കുന്നു');
           break;
 
-        case INTENT_TYPES.CONFIRM:
+        case 'general.confirm':
           voice.speak('ശരി');
           break;
 
-        case INTENT_TYPES.CANCEL:
+        case 'general.cancel':
           voice.speak('റദ്ദാക്കി');
+          break;
+
+        case 'general.greeting':
+          voice.speak('നമസ്കാരം! എന്ത് സഹായം വേണം?');
+          break;
+
+        case 'general.help':
+          voice.speak('നിങ്ങൾക്ക് ഉൽപ്പന്നങ്ങൾ ബില്ലിൽ ചേർക്കാം. ഉദാഹരണം: രണ്ട് കിലോ അരി');
           break;
 
         default:
           voice.speak(ML_RESPONSES.notUnderstood);
       }
     },
-    [total]
+    [total, processText, findProduct]
   );
 
   const voice = useVoice({
@@ -178,9 +188,10 @@ export default function BillingPage() {
           />
 
           {/* Last intent debug (dev only) */}
-          {lastIntent && process.env.NODE_ENV === 'development' && (
+          {lastResult && process.env.NODE_ENV === 'development' && (
             <div className="mt-4 text-xs text-muted-foreground">
-              Intent: {lastIntent.type} ({(lastIntent.confidence * 100).toFixed(0)}%)
+              Intent: {lastResult.intent} ({(lastResult.confidence * 100).toFixed(0)}%) 
+              <span className="ml-2 text-blue-500">[{lastResult.source}]</span>
             </div>
           )}
         </CardContent>

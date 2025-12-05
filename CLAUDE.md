@@ -511,6 +511,19 @@ const { data, error } = await supabase
 
 ## 📅 Changelog
 
+### 2025-12-05 (Session 3) - Smart NLP & Dialogflow Integration
+- Created `/lib/nlp/useSmartNLP.ts` - unified NLP hook combining Dialogflow with local fallback
+- Created `/app/api/dialogflow/detect/route.ts` - server-side API route for Dialogflow calls
+- Updated billing page to use Smart NLP with Dialogflow support
+- Added voice control to inventory page for stock management via voice
+- Voice commands now support:
+  - Adding stock via voice: "50 കിലോ അരി സ്റ്റോക്കിൽ ചേർക്കുക"
+  - Checking stock via voice: "അരി എത്ര ഉണ്ട്"
+  - Automatic low stock alerts via voice
+- Created `/docs/DIALOGFLOW_SETUP.md` with comprehensive setup guide
+- Updated `.env.local.example` with Dialogflow environment variables
+- Debug mode shows NLP source [dialogflow] or [local] in UI
+
 ### 2025-11-30 (Session 2) - QR & Product Integration
 - Added PWA manifest.json with app metadata
 - Created icon.svg placeholder for app icons
@@ -525,6 +538,10 @@ const { data, error } = await supabase
 - Updated billing page to use product database for cart
 - Updated inventory page to use useProducts hook
 - Added add product functionality to inventory
+- Fixed voice recognition 3-second timeout bug (useVoice.ts rewrite)
+- Changed voice to Malayalam (`ml-IN`)
+- Implemented continuous listening mode
+- Changed voice button to tap-to-toggle
 
 ### 2024-11-30 (Session 1) - Phase 1-3 Complete
 - Created CLAUDE.md documentation
@@ -545,4 +562,5 @@ const { data, error } = await supabase
 
 ---
 
-*Last Updated: November 30, 2025*
+*Last Updated: December 5, 2025*
+
