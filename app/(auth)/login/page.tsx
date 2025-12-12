@@ -7,19 +7,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mic, Phone, ArrowRight, Loader2 } from 'lucide-react';
+import { Mic, Phone, ArrowRight, Loader2, Play } from 'lucide-react';
 
 type Step = 'phone' | 'otp';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signInWithOtp, verifyOtp } = useAuth();
+  const { signInWithOtp, verifyOtp, enableDemoMode } = useAuth();
   
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleDemoMode = () => {
+    enableDemoMode();
+    router.push('/dashboard');
+  };
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,12 +42,17 @@ export default function LoginPage() {
 
       const { error } = await signInWithOtp(cleanPhone);
       if (error) {
-        setError(error.message);
+        // Check if it's a network error (Supabase not configured)
+        if (error.message.includes('fetch') || error.message.includes('network')) {
+          setError('Supabase not configured. Use "Try Demo" button below.');
+        } else {
+          setError(error.message);
+        }
       } else {
         setStep('otp');
       }
     } catch (err) {
-      setError('Failed to send OTP. Please try again.');
+      setError('Connection failed. Use "Try Demo" button below.');
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +144,14 @@ export default function LoginPage() {
             </form>
           ) : (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
+              {/* Demo OTP hint */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                <p className="text-sm text-blue-700 font-medium">📱 Demo Mode</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Enter OTP: <span className="font-mono font-bold text-lg">123456</span>
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="otp">Enter OTP</Label>
                 <Input
@@ -182,11 +200,20 @@ export default function LoginPage() {
             </form>
           )}
 
-          {/* Demo mode for development */}
+          {/* Demo mode button */}
           <div className="mt-6 pt-6 border-t">
             <p className="text-xs text-center text-muted-foreground mb-3">
-              For demo, use any phone number and OTP: 123456
+              No Supabase configured? Try the app in demo mode:
             </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleDemoMode}
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Try Demo Mode
+            </Button>
           </div>
         </CardContent>
       </Card>

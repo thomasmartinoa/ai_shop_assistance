@@ -103,10 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize auth state
   useEffect(() => {
     const initAuth = async () => {
-      // If Supabase is not configured, enable demo mode
+      // If Supabase is not configured, just stop loading
+      // Don't auto-enable demo mode - let user click "Get Started" first
       if (!isSupabaseConfigured) {
-        console.log('Supabase not configured, enabling demo mode');
-        enableDemoMode();
+        console.log('Supabase not configured, demo mode available');
+        setIsLoading(false);
         return;
       }
 
@@ -148,10 +149,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Sign in with phone OTP
   const signInWithOtp = async (phone: string) => {
-    if (isDemoMode || !supabase) {
-      // In demo mode, just enable demo mode
-      enableDemoMode();
-      return { error: null };
+    if (!isSupabaseConfigured || !supabase) {
+      // In demo mode, proceed to OTP step (don't auto-login yet)
+      // This allows user to see the OTP verification flow
+      return { error: null, isDemo: true };
     }
 
     try {
@@ -170,13 +171,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Verify OTP
   const verifyOtp = async (phone: string, token: string) => {
-    if (isDemoMode || !supabase) {
-      // In demo mode, accept any OTP
+    if (!isSupabaseConfigured || !supabase) {
+      // In demo mode, accept demo OTP
       if (token === '123456') {
         enableDemoMode();
         return { error: null };
       }
-      return { error: new Error('Invalid OTP. Use 123456 for demo.') };
+      return { error: new Error('Demo OTP is 123456') };
     }
 
     try {
