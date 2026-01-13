@@ -104,6 +104,16 @@ export async function detectIntent(text: string): Promise<DialogflowResponse | n
     }
 
     const data = await response.json();
+    
+    // Debug logging - see what Dialogflow returns
+    console.log('[Dialogflow Response]', {
+      queryText: data.queryResult?.queryText,
+      intent: data.queryResult?.intent?.displayName,
+      confidence: data.queryResult?.intentDetectionConfidence,
+      parameters: data.queryResult?.parameters,
+      fulfillmentText: data.queryResult?.fulfillmentText,
+    });
+    
     return parseDialogflowResponse(data, text);
   } catch (error) {
     console.error('Dialogflow detection failed:', error);

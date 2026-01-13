@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "shopkeeper-ai",
+  "private_key_id": "34aa5428b332b555bb4b6f7016b6ec053419bca1",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC0+Iu17dvfI3bE\nVmyD/siQto2y9D9B+wX7nsYtbXqX8uDk8brLmNROf3FPL9xytrPfJPzCN2KrCSu3\nyqx7DAzVFTF/unxQJB7kBHEY8/6t2Q40njmjf0Sd2TMLhoCVxJUXPINuzqzkccJz\n1eJBGFiiciySTjZ5KKq7GJSNW2GQRAKG3f27IwP4uPZ7tn0YYsALaWj0kiwV9JHX\nQoJmrLjaAHLYMTh3fjd10BMOLa1lf0cXKuWY630N0UhvIpAoR2HSpu/GaCfczGQ5\nDRKpLYcLgMC1NAKGGluVYBF+NcEirLogflwwVwpKORnpsijjif6eFoXPXtVzVMpb\nl4w5MAItAgMBAAECggEAAePgra9EzyFTMbzHWF+WX7CQbVCQwpMpHlYrsrjEgYbH\nY4zEyzCW8xTwrYeN8WLIISoFO9ARR0EKxFopEAXxsl4MzM05VCr0aaREPCL8Q3uT\nYuhOKM+A+3cTyeiHOkk512rJ4qPk+WPYyJXwzYZAEr5HieWoOv66PccFci6Ep9mR\ncOiPxeJNMIpVlp9Z6JiP2fer9OqNssAsHZCre4fqFr2//0aZfvfWOjMue/osykp5\nR24/oXlBFvhlC/Hexqd0ozXpgJj8bGco+wd/+Y3yfLK73U5/gOdDvaJfLtmJNp8r\nJpgrcLaUcXsZWqCWQ1LvnvME9auznZ7mTFNnyP0RkQKBgQD9Pa9yU/xAx8vBXTnv\nbR6DcPRW4Aw3IZl8tn4SS3hBHEEmBAb8z7iY19NZGnDucPgajkPYDg5xJ6wKxNBl\n+DpoLiRGnPUIUIu9JMW0rufA2K94KoXR7XKTIM7ggMohksVI7KmXCiIo8+ETNQ57\nQFV+euXwhqLNLrRCzRhLsQmGCQKBgQC28Uq2nqlyR7s7HoJWth+a1tlUbnckJrTk\nO5abCmnngfffDSnB5PuWv94tRTVyTIFZ0vGAdoYRnKlBRz5CrODr7fthuaEd6AmI\nJ1wfUCI6pM20/D1QbDyUUh4Rra1sRAbxYnXzAevkflh2QjgCMZ974SCJDuRRE6C/\nMpri4rZEBQKBgC8ShkhEIEGSYeeBgsFkkSVxm5mCcALXdgZejbSs3p+LtvhwCzR3\nECMpCxom9hL8YMHe6/F/O2QBMdOWnf42U/UFjqyphEqVXkQ8T5u0X1PTc1ps3Q8W\nihObJ5lHl0sCUzWo+CUhNxRRsOa3GAgE/19RTOiWvjBRnCRGp1t6fwCxAoGAV48f\nSk6gHTFV3JLaoTPj5pEkTbPdVDEubPpUN/qA+6wJ/fjn3oSBIgLNDO/OB9m0I1DC\nA9E2k+FeZP77PqBNur4ZjglxosW3IjJsdhQ9fcH5LsF3ezGCwR6Yg6+TjHj2tbuB\nZoCp7Z/HKTrCYdJsWbdDgjXdcyyoyDopRaRqxh0CgYALJRSUQO3nFvMwkr1JEzrr\n4ELCFCvhDt1J10nrR9iqnyrnRVcHi8eFx1wI6CSb1frkPef3BImAsyp/1j7KyuCW\nVwQMoy0ZdI3cyQmMvCFSF9BHtRXTmlUvUEX6Jxm2QwH0wt0ytO2FNOuE0PYwVoBH\n/ixcYMPZThV9eOZ7kb/aZg==\n-----END PRIVATE KEY-----\n",
+  "client_email": "dialogflow-client@shopkeeper-ai.iam.gserviceaccount.com",
+  "client_id": "115490187880102920145",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/dialogflow-client%40shopkeeper-ai.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

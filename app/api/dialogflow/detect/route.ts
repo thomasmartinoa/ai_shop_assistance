@@ -91,9 +91,10 @@ async function getAccessToken(clientEmail: string, privateKey: string): Promise<
   const payload = {
     iss: clientEmail,
     sub: clientEmail,
-    aud: 'https://dialogflow.googleapis.com/',
+    aud: 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: expiry,
+    scope: 'https://www.googleapis.com/auth/dialogflow',
   };
 
   // Encode header and payload
