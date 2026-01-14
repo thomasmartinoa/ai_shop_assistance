@@ -20,12 +20,12 @@ export type DialogflowIntentType =
   | 'billing.remove'        // Remove item: "അരി മാറ്റുക"
   | 'billing.clear'         // Clear bill: "ബിൽ ക്ലിയർ"
   | 'billing.total'         // Get total: "ടോട്ടൽ എത്ര"
-  | 'billing.complete'      // Complete transaction
+  | 'billing.complete'      // Complete transaction: "ബിൽ ചെയ്യൂ", "അത്രതന്നെ"
   | 'inventory.add'         // Add to inventory: "സ്റ്റോക്കിൽ 50 കിലോ അരി ചേർക്കുക"
   | 'inventory.check'       // Check stock: "അരി എത്ര ഉണ്ട്"
   | 'inventory.update'      // Update stock
   | 'payment.upi'           // UPI payment: "QR കാണിക്കുക"
-  | 'payment.cash'          // Cash payment
+  | 'payment.cash'          // Cash payment: "കാഷ്"
   | 'report.today'          // Today's sales
   | 'report.week'           // Weekly report
   | 'navigation.billing'    // Go to billing
@@ -33,7 +33,8 @@ export type DialogflowIntentType =
   | 'general.help'          // Help request
   | 'general.greeting'      // Greeting
   | 'general.cancel'        // Cancel action
-  | 'general.confirm'       // Confirm action
+  | 'general.confirm'       // Confirm action: "ശരി", "yes"
+  | 'general.addmore'       // Add more items: "ഇനിയും വേണം", "കൂടി"
   | 'fallback';             // Unknown intent
 
 export interface DialogflowEntity {

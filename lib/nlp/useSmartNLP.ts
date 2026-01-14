@@ -38,7 +38,7 @@ const MALAYALAM_PATTERNS = {
     /ടോട്ടൽ|total|എത്ര|മൊത്തം|ആകെ|കൂട്ടുക/i,
   ],
   'billing.complete': [
-    /complete|done|finish|കഴിഞ്ഞു|പൂർത്തിയായി|ബിൽ കഴിഞ്ഞു/i,
+    /complete|done|finish|കഴിഞ്ഞു|പൂർത്തിയായി|ബിൽ കഴിഞ്ഞു|bill it|bill ചെയ്യൂ|അത്രതന്നെ|മതി|ഇല്ല|no more|that's all|അത്ര മതി/i,
   ],
   
   // Inventory patterns
@@ -86,10 +86,13 @@ const MALAYALAM_PATTERNS = {
     /hello|hi|ഹലോ|നമസ്കാരം|hai/i,
   ],
   'general.cancel': [
-    /cancel|റദ്ദാക്കുക|വേണ്ട|നിർത്തുക/i,
+    /cancel|റദ്ദാക്കുക|വേണ്ട|നിർത്തുക|stop|no/i,
   ],
   'general.confirm': [
-    /yes|ശരി|okay|ശരിയാണ്|confirm|ശെരി|oo|ഓ|ആണ്/i,
+    /yes|ശരി|okay|ശരിയാണ്|confirm|ശെരി|oo|ഓ|ആണ്|ഉവ്വ്|ഓക്കെ|ok|bill ചെയ്യൂ|proceed/i,
+  ],
+  'general.addmore': [
+    /കൂടി|more|വേറെ|add more|ഇനിയും|വേണം|another|കൂടെ|മറ്റൊന്ന്|ഉണ്ട്/i,
   ],
 };
 

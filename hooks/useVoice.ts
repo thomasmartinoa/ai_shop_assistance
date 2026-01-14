@@ -90,6 +90,28 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
     stateRef.current = state;
   }, [state]);
 
+  // Initialize speech synthesis voices on mount
+  useEffect(() => {
+    if (isSpeechSynthesisSupported()) {
+      // Trigger voice loading
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length === 0) {
+        // Voices not loaded yet, they'll load on first speak
+        window.speechSynthesis.onvoiceschanged = () => {
+          const loadedVoices = window.speechSynthesis.getVoices();
+          console.log('🔊 Voices loaded:', loadedVoices.length);
+          // Log available Indian voices
+          const indianVoices = loadedVoices.filter(v => 
+            v.lang.startsWith('ml') || v.lang.startsWith('hi') || v.lang === 'en-IN'
+          );
+          console.log('🔊 Indian voices:', indianVoices.map(v => `${v.name} (${v.lang})`));
+        };
+      } else {
+        console.log('🔊 Voices already loaded:', voices.length);
+      }
+    }
+  }, []);
+
   // Initialize speech recognition ONCE
   useEffect(() => {
     if (!isSupported) {
@@ -271,32 +293,115 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
     }
   }, [startListening, stopListening]);
 
-  const speak = useCallback(async (text: string, textLang?: string): Promise<void> => {
+  // Use Google Translate TTS for Malayalam (Chrome doesn't have Malayalam voice)
+  const speakWithGoogleTTS = useCallback(async (text: string, ttsLang: string = 'ml'): Promise<void> => {
+    console.log('🔊 Speaking with Google TTS:', text, 'lang:', ttsLang);
+    
+    return new Promise((resolve, reject) => {
+      try {
+        setState('speaking');
+        
+        // Google Translate TTS endpoint
+        // Encode the text for URL
+        const encodedText = encodeURIComponent(text);
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${ttsLang}&client=tw-ob&q=${encodedText}`;
+        
+        const audio = new Audio(url);
+        audio.volume = 1.0;
+        
+        audio.oncanplaythrough = () => {
+          console.log('🔊 Audio ready, playing...');
+          audio.play().catch(err => {
+            console.error('🔊 Play error:', err);
+            setState('idle');
+            resolve();
+          });
+        };
+        
+        audio.onplay = () => {
+          console.log('🔊 Malayalam speech started');
+        };
+        
+        audio.onended = () => {
+          console.log('🔊 Malayalam speech ended');
+          setState('idle');
+          resolve();
+        };
+        
+        audio.onerror = (e) => {
+          console.error('🔊 Audio error:', e);
+          // Fallback to browser TTS
+          console.log('🔊 Falling back to browser TTS...');
+          speakWithBrowserTTS(text, ttsLang).then(resolve);
+        };
+        
+        // Timeout fallback
+        setTimeout(() => {
+          if (audio.paused && audio.currentTime === 0) {
+            console.log('🔊 Audio timeout, trying fallback...');
+            speakWithBrowserTTS(text, ttsLang).then(resolve);
+          }
+        }, 3000);
+        
+      } catch (error) {
+        console.error('🔊 Google TTS error:', error);
+        speakWithBrowserTTS(text, ttsLang).then(resolve);
+      }
+    });
+  }, []);
+
+  // Fallback browser TTS
+  const speakWithBrowserTTS = useCallback(async (text: string, textLang?: string): Promise<void> => {
     if (!isSpeechSynthesisSupported()) {
       console.warn('🔊 Speech synthesis not supported');
       return;
     }
 
+    console.log('🔊 Speaking with browser TTS:', text);
+
     return new Promise((resolve) => {
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = textLang || lang;
-      utterance.rate = 0.9;
+      const voices = window.speechSynthesis.getVoices();
+      const targetLang = textLang || lang;
+      
+      // Try to find best available voice
+      let selectedVoice = voices.find(v => v.lang.startsWith('ml')) ||
+                          voices.find(v => v.lang.startsWith('hi')) ||
+                          voices.find(v => v.lang === 'en-IN') ||
+                          voices.find(v => v.lang.startsWith('en'));
+
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        console.log('🔊 Using browser voice:', selectedVoice.name, selectedVoice.lang);
+      }
+
+      utterance.lang = targetLang;
+      utterance.rate = 0.85;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
 
       utterance.onstart = () => setState('speaking');
-      utterance.onend = () => {
-        setState('idle');
-        resolve();
-      };
-      utterance.onerror = () => {
-        setState('idle');
-        resolve();
-      };
+      utterance.onend = () => { setState('idle'); resolve(); };
+      utterance.onerror = () => { setState('idle'); resolve(); };
 
       window.speechSynthesis.speak(utterance);
     });
   }, [lang]);
+
+  // Main speak function - uses Google TTS for Malayalam, browser for others
+  const speak = useCallback(async (text: string, textLang?: string): Promise<void> => {
+    const targetLang = textLang || lang;
+    
+    // Use Google TTS for Malayalam (Chrome doesn't have Malayalam voice)
+    if (targetLang.startsWith('ml') || targetLang === 'ml-IN') {
+      return speakWithGoogleTTS(text, 'ml');
+    }
+    
+    // Use browser TTS for other languages
+    return speakWithBrowserTTS(text, targetLang);
+  }, [lang, speakWithGoogleTTS, speakWithBrowserTTS]);
 
   const cancelSpeech = useCallback(() => {
     if (isSpeechSynthesisSupported()) {
