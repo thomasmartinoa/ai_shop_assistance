@@ -293,24 +293,45 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
     }
   }, [startListening, stopListening]);
 
-  // Use Google Translate TTS for Malayalam (Chrome doesn't have Malayalam voice)
+  // Use server-side TTS API for Malayalam (bypasses CORS and uses proper Malayalam voice)
   const speakWithGoogleTTS = useCallback(async (text: string, ttsLang: string = 'ml'): Promise<void> => {
-    console.log('🔊 Speaking with Google TTS:', text, 'lang:', ttsLang);
+    console.log('🔊 Speaking with server-side TTS API:', text, 'lang:', ttsLang);
     
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve) => {
       try {
         setState('speaking');
         
-        // Google Translate TTS endpoint
-        // Encode the text for URL
-        const encodedText = encodeURIComponent(text);
-        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${ttsLang}&client=tw-ob&q=${encodedText}`;
+        // Call our server-side TTS API
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, lang: ttsLang }),
+        });
+
+        if (!response.ok) {
+          console.error('🔊 TTS API error:', response.status);
+          // Fallback to browser TTS
+          console.log('🔊 Falling back to browser TTS...');
+          await speakWithBrowserTTS(text, ttsLang);
+          resolve();
+          return;
+        }
+
+        const data = await response.json();
         
-        const audio = new Audio(url);
+        if (!data.audioUrl) {
+          console.error('🔊 No audio URL in response');
+          await speakWithBrowserTTS(text, ttsLang);
+          resolve();
+          return;
+        }
+
+        // Play the audio from data URL
+        const audio = new Audio(data.audioUrl);
         audio.volume = 1.0;
         
         audio.oncanplaythrough = () => {
-          console.log('🔊 Audio ready, playing...');
+          console.log('🔊 Audio ready, playing Malayalam...');
           audio.play().catch(err => {
             console.error('🔊 Play error:', err);
             setState('idle');
@@ -329,23 +350,16 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
         };
         
         audio.onerror = (e) => {
-          console.error('🔊 Audio error:', e);
+          console.error('🔊 Audio playback error:', e);
           // Fallback to browser TTS
           console.log('🔊 Falling back to browser TTS...');
           speakWithBrowserTTS(text, ttsLang).then(resolve);
         };
         
-        // Timeout fallback
-        setTimeout(() => {
-          if (audio.paused && audio.currentTime === 0) {
-            console.log('🔊 Audio timeout, trying fallback...');
-            speakWithBrowserTTS(text, ttsLang).then(resolve);
-          }
-        }, 3000);
-        
       } catch (error) {
-        console.error('🔊 Google TTS error:', error);
-        speakWithBrowserTTS(text, ttsLang).then(resolve);
+        console.error('🔊 TTS API error:', error);
+        await speakWithBrowserTTS(text, ttsLang);
+        resolve();
       }
     });
   }, []);
