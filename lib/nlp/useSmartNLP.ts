@@ -21,78 +21,108 @@ export interface NLPResult {
 
 // Malayalam keywords for local pattern matching
 const MALAYALAM_PATTERNS = {
-  // Billing patterns
+  // Billing patterns - Add items (highest priority for common commands)
   'billing.add': [
-    /(\d+)\s*(കിലോ|kg|കിലൊ|litre|ലിറ്റർ|piece|എണ്ണം)?\s*(അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്)/i,
-    /(അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്)\s*(\d+)\s*(കിലോ|kg|ലിറ്റർ|എണ്ണം)?/i,
-    /add|ചേർക്കുക|ചേർക്കൂ|കൂട്ടുക/i,
+    /(\d+(?:\.\d+)?)\s*(?:കിലോ|kg|കിലൊ|litre|ലിറ്റർ|piece|എണ്ണം|കിലോ ഗ്രാം)?\s*(?:അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്|പഞ്ചസരം|റൈസ്|rice|sugar|oil|tea|milk|flour|salt|soap)/i,
+    /(?:അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്|പഞ്ചസരം|റൈസ്)\s*(\d+(?:\.\d+)?)\s*(?:കിലോ|kg|ലിറ്റർ|എണ്ണം)?/i,
+    /(?:add|ചേർക്കുക|ചേർക്കൂ|കൂട്ടുക|ചേർത്തൂ|എടുത്തൂ)\s+(?:അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്|പഞ്ചസരം)/i,
+    /(?:അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്|പഞ്ചസരം)\s+(?:ചേർക്കുക|ചേർക്കൂ|കൂട്ടുക|add)/i,
+    /add\s+(\d+)?/i,
   ],
+  
+  // Billing patterns - Remove items
   'billing.remove': [
-    /മാറ്റുക|remove|ഒഴിവാക്കുക|കളയുക|delete/i,
-    /(അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്)\s*മാറ്റുക/i,
+    /(?:മാറ്റുക|remove|ഒഴിവാക്കുക|കളയുക|delete|ഡിലീറ്റ്|വേണ്ടം|വേണ്ട)/i,
+    /(?:അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്)\s+(?:മാറ്റുക|remove|കളയുക)/i,
   ],
+  
+  // Billing patterns - Clear bill
   'billing.clear': [
-    /ക്ലിയർ|clear|bill clear|ബിൽ ക്ലിയർ|എല്ലാം മാറ്റുക|പുതിയ ബിൽ/i,
+    /(?:ക്ലിയർ|clear|bill clear|ബിൽ ക്ലിയർ|എല്ലാം മാറ്റുക|പുതിയ ബിൽ|പുതിയ)|reset/i,
   ],
+  
+  // Billing patterns - Get total
   'billing.total': [
-    /ടോട്ടൽ|total|എത്ര|മൊത്തം|ആകെ|കൂട്ടുക/i,
+    /(?:ടോട്ടൽ|total|എത്ര|മൊത്തം|ആകെ|കൂട്ടുക|sum)/i,
   ],
+  
+  // Billing patterns - Complete transaction (bill it, done, no more)
   'billing.complete': [
-    /complete|done|finish|കഴിഞ്ഞു|പൂർത്തിയായി|ബിൽ കഴിഞ്ഞു|bill it|bill ചെയ്യൂ|അത്രതന്നെ|മതി|ഇല്ല|no more|that's all|അത്ര മതി/i,
+    /(?:complete|done|finish|കഴിഞ്ഞു|പൂർത്തിയായി|ബിൽ കഴിഞ്ഞു|bill it|bill ചെയ്യൂ|അത്രതന്നെ|മതി|ഇല്ല|no more|that's all|അത്ര|നിൻ്നു|കഴിഞ്ഞി|സരി|ബിൽ|ബില്ല്|finished)/i,
   ],
   
   // Inventory patterns
   'inventory.add': [
-    /സ്റ്റോക്ക്.*ചേർക്കുക|add.*stock|stock.*add|ഇൻവെൻ്ററി.*ചേർക്കുക/i,
-    /(\d+)\s*(കിലോ|kg|ലിറ്റർ|എണ്ണം)?\s*(അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്)\s*സ്റ്റോക്കിൽ/i,
-  ],
-  'inventory.check': [
-    /സ്റ്റോക്ക്.*എത്ര|stock.*check|എത്ര.*ഉണ്ട്|സ്റ്റോക്ക്.*ഉണ്ട്/i,
-    /(അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്)\s*എത്ര/i,
-  ],
-  'inventory.update': [
-    /സ്റ്റോക്ക്.*അപ്ഡേറ്റ്|update.*stock|stock.*update/i,
+    /(?:സ്റ്റോക്ക്|stock|inventory|ഇൻവെൻ്ററി).*(?:ചേർക്കുക|add|ചേർത്തു)/i,
+    /(?:ചേർക്കുക|add)\s+(?:സ്റ്റോക്കിൽ|to stock)/i,
+    /(\d+)\s*(?:കിലോ|kg|ലിറ്റർ)\s*(?:അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്)\s*(?:സ്റ്റോക്കിൽ|stock)/i,
   ],
   
-  // Payment patterns
-  'payment.upi': [
-    /qr|QR|ക്യു ആർ|upi|gpay|phonepay|paytm|QR കാണിക്കുക|പേയ്‌മെൻ്റ്/i,
+  // Inventory patterns - Check stock
+  'inventory.check': [
+    /(?:സ്റ്റോക്ക്|stock|inventory).*(?:എത്ര|check|ഉണ്ട്|നോക്കി)/i,
+    /(?:എത്ര|how much).*(?:സ്റ്റോക്കിൽ|in stock)/i,
+    /(?:അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്)\s*(?:എത്ര|how much)/i,
   ],
+  
+  // Inventory patterns - Update stock
+  'inventory.update': [
+    /(?:സ്റ്റോക്ക്|stock|inventory).*(?:അപ്ഡേറ്റ്|update|പരിഷ്കരിക്കുക)/i,
+  ],
+  
+  // Payment patterns - UPI/QR
+  'payment.upi': [
+    /(?:qr|QR|ക്യു ആർ|upi|gpay|google pay|phonepay|paytm|QR കാണിക്കുക|QR കാണിച്ച|കാണിക്കുക|കാണിച്ച|payment|പേയ്മെന്റ്)/i,
+  ],
+  
+  // Payment patterns - Cash
   'payment.cash': [
-    /cash|കാഷ്|നോട്ട്|പൈസ|രൂപ/i,
+    /(?:cash|കാഷ്|നോട്ട്|പൈസ|രൂപ|money|പണം|പണിക്കൊടുക്കാം)/i,
   ],
   
   // Report patterns
   'report.today': [
-    /ഇന്നത്തെ.*സെയിൽസ്|today.*sales|daily.*report|ഇന്ന്.*റിപ്പോർട്ട്/i,
+    /(?:ഇന്നത്തെ|today).*(?:സെയിൽസ്|sales|റിപ്പോർട്ട്|report)/i,
+    /daily.*(?:report|sales)/i,
   ],
+  
   'report.week': [
-    /ആഴ്ച.*റിപ്പോർട്ട്|weekly|week.*sales|this week/i,
+    /(?:ആഴ്ച|week).*(?:റിപ്പോർട്ട്|report|sales)/i,
+    /weekly/i,
   ],
   
   // Navigation patterns
   'navigation.billing': [
-    /billing|ബിൽ|bill page|ബില്ലിംഗ്/i,
-  ],
-  'navigation.inventory': [
-    /inventory|ഇൻവെൻ്ററി|stock page|സ്റ്റോക്ക് പേജ്/i,
+    /(?:billing|ബിൽ|bill page|ബില്ലിംഗ്|ബില്ലിങ്|billing page)/i,
   ],
   
-  // General patterns
+  'navigation.inventory': [
+    /(?:inventory|ഇൻവെൻ്ററി|stock page|സ്റ്റോക്ക് പേജ്|stock)/i,
+  ],
+  
+  // General patterns - Help
   'general.help': [
-    /help|സഹായം|എന്താ ചെയ്യുക|എങ്ങനെ/i,
+    /(?:help|സഹായം|എന്താ ചെയ്യുക|എങ്ങനെ|how|എങ്ങനെ ചെയ്യാം)/i,
   ],
+  
+  // General patterns - Greeting
   'general.greeting': [
-    /hello|hi|ഹലോ|നമസ്കാരം|hai/i,
+    /(?:hello|hi|ഹലോ|നമസ്കാരം|hai|വണ്ണം)/i,
   ],
+  
+  // General patterns - Cancel
   'general.cancel': [
-    /cancel|റദ്ദാക്കുക|വേണ്ട|നിർത്തുക|stop|no/i,
+    /(?:cancel|റദ്ദാക്കുക|വേണ്ട|നിർത്തുക|stop|no|ഇല്ലാ)/i,
   ],
+  
+  // General patterns - Confirm (yes, ok, sure)
   'general.confirm': [
-    /yes|ശരി|okay|ശരിയാണ്|confirm|ശെരി|oo|ഓ|ആണ്|ഉവ്വ്|ഓക്കെ|ok|bill ചെയ്യൂ|proceed/i,
+    /(?:yes|ശരി|okay|ശരിയാണ്|confirm|ശെരി|oo|ഓ|ആണ്|ഉവ്വ്|ഓക്കെ|ok|ok ടെ|bill ചെയ്യൂ|proceed|yes sir|ഉണ്ട്|അതേ|അതേ ഫിയർ)/i,
   ],
+  
+  // General patterns - Add more items
   'general.addmore': [
-    /കൂടി|more|വേറെ|add more|ഇനിയും|വേണം|another|കൂടെ|മറ്റൊന്ന്|ഉണ്ട്/i,
+    /(?:കൂടി|more|വേറെ|add more|ഇനിയും|വേണം|another|കൂടെ|മറ്റൊന്ന്|ഉണ്ട്|കൂടെ വേണം|ഇനിയും വേണം|വേറെ ഉണ്ട്|കൂടെ വേണ്ടത്|നേ കൂടി)/i,
   ],
 };
 
@@ -185,12 +215,15 @@ function detectLocalIntent(text: string): NLPResult {
     confidence: 0,
   };
   
+  console.log('🧠 NLP: Detecting intent for:', text);
+  
   // Check each pattern
   for (const [intent, patterns] of Object.entries(MALAYALAM_PATTERNS)) {
     for (const pattern of patterns) {
       if (pattern.test(text)) {
         // Calculate confidence based on match quality
         const confidence = 0.7; // Base confidence for local matching
+        console.log('🧠 NLP: Pattern matched -', intent, 'confidence:', confidence);
         if (confidence > bestMatch.confidence) {
           bestMatch = {
             intent: intent as DialogflowIntentType,
@@ -205,10 +238,14 @@ function detectLocalIntent(text: string): NLPResult {
   // Extract entities
   const entities = extractLocalEntities(text);
   
+  console.log('🧠 NLP: Extracted entities:', entities);
+  
   // Boost confidence if entities were found
   if (entities.product || entities.quantity) {
     bestMatch.confidence = Math.min(bestMatch.confidence + 0.1, 0.9);
   }
+  
+  console.log('🧠 NLP: Final result - intent:', bestMatch.intent, 'confidence:', bestMatch.confidence);
   
   return {
     intent: bestMatch.intent,
@@ -274,15 +311,18 @@ export function useSmartNLP() {
       };
     }
 
+    console.log('🧠 NLP: Processing text:', text);
     setIsProcessing(true);
     setError(null);
 
     try {
       // Try Dialogflow first if configured
       if (isDialogflowConfigured() && dialogflowAvailable.current !== false) {
+        console.log('🧠 NLP: Attempting Dialogflow...');
         const dialogflowResult = await detectIntent(text);
         
         if (dialogflowResult) {
+          console.log('🧠 NLP: Dialogflow success:', dialogflowResult.intent);
           dialogflowAvailable.current = true;
           const result: NLPResult = {
             intent: dialogflowResult.intent,
@@ -297,21 +337,24 @@ export function useSmartNLP() {
           return result;
         } else {
           // Dialogflow failed, mark as unavailable for this session
+          console.log('🧠 NLP: Dialogflow unavailable, using local patterns');
           dialogflowAvailable.current = false;
         }
       }
 
       // Fall back to local pattern matching
+      console.log('🧠 NLP: Using local pattern matching');
       const localResult = detectLocalIntent(text);
       setLastResult(localResult);
       setIsProcessing(false);
       return localResult;
 
     } catch (err) {
-      console.error('NLP processing error:', err);
+      console.error('🧠 NLP processing error:', err);
       setError(err instanceof Error ? err.message : 'NLP processing failed');
       
       // Fall back to local on error
+      console.log('🧠 NLP: Error occurred, falling back to local patterns');
       const localResult = detectLocalIntent(text);
       setLastResult(localResult);
       setIsProcessing(false);

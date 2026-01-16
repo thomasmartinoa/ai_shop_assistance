@@ -68,15 +68,21 @@ export default function BillingPage() {
     async (transcript: string, isFinal: boolean) => {
       if (!isFinal) return;
 
+      console.log('📱 Billing: Voice result received:', transcript);
+
       // Process through Smart NLP (Dialogflow + local fallback)
       const result = await processText(transcript);
 
+      console.log('📱 Billing: NLP result:', result.intent, 'confidence:', result.confidence);
+
       // Check if user is responding to "anything else?" confirmation
       if (conversationState === 'awaiting_confirmation') {
+        console.log('📱 Billing: In awaiting_confirmation state');
         // User wants to add more items
         if (result.intent === 'billing.add' || 
             result.intent === 'general.addmore' ||
             /കൂടി|more|വേറെ|add|ചേർക്കുക|ഇനി|വേണം|ഉണ്ട്/i.test(transcript)) {
+          console.log('📱 Billing: User wants to add more items');
           setConversationState('idle');
           // If they said something like "വേറെ ഉണ്ട്" or "ഇനിയും വേണം" without product, just wait
           if (result.intent !== 'billing.add') {
@@ -90,6 +96,7 @@ export default function BillingPage() {
                  result.intent === 'billing.complete' ||
                  result.intent === 'billing.total' ||
                  /ശരി|ഇല്ല|മതി|അത്രതന്നെ|bill|ബിൽ|done|കഴിഞ്ഞു|no more|അത്ര|that's all|proceed/i.test(transcript)) {
+          console.log('📱 Billing: User confirmed billing');
           setConversationState('processing_payment');
           const totalAmount = Math.round(total);
           voice.speak(`ശരി, ആകെ തുക ${totalAmount} രൂപ. പേയ്‌മെൻ്റ് എങ്ങനെ? UPI അല്ലെങ്കിൽ കാഷ്?`);
@@ -97,6 +104,7 @@ export default function BillingPage() {
         }
         // User wants to cancel
         else if (result.intent === 'general.cancel' || /cancel|റദ്ദാക്കുക|വേണ്ട/i.test(transcript)) {
+          console.log('📱 Billing: User cancelled');
           setConversationState('idle');
           voice.speak('ശരി, ഇനിയും ഉൽപ്പന്നങ്ങൾ ചേർക്കാം');
           return;
