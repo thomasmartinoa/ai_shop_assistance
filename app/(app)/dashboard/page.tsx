@@ -14,15 +14,18 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { SalesCopilot } from '@/components/copilot/SalesCopilot';
+import { useProducts } from '@/hooks/useProducts';
 
 export default function DashboardPage() {
   const { shop } = useAuth();
+  const { products } = useProducts();
 
   // TODO: Fetch actual data from Supabase
   const stats = {
     todaySales: 4520,
     totalOrders: 23,
-    lowStockItems: 5,
+    lowStockItems: products.filter(p => p.stock <= p.min_stock).length || 5,
     topProduct: 'Rice (അരി)',
   };
 
@@ -144,6 +147,11 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* AI Sales Copilot */}
+      <div className="mt-6">
+        <SalesCopilot products={products} />
+      </div>
     </div>
   );
 }
