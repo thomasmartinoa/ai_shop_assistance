@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useVoice } from '@/hooks/useVoice';
 import { useProducts } from '@/hooks/useProducts';
 import { useSmartNLP, type NLPResult } from '@/lib/nlp/useSmartNLP';
@@ -50,18 +50,28 @@ export default function BillingPage() {
   const [conversationState, setConversationState] = useState<ConversationState>('idle');
   const [lastAddedItem, setLastAddedItem] = useState<string | null>(null);
 
+  // Create a ref for the voice API to break circular dependency
+  const voiceApiRef = useRef<{
+    speak: (text: string, lang?: string) => Promise<void>;
+    cancelSpeech: () => void;
+  } | null>(null);
+
+  // Helper function to safely call voice.speak
+  const speakText = useCallback((text: string) => {
+    voiceApiRef.current?.speak(text);
+  }, []);
+
   // Load products on mount
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
 
-  // Calculate totals
-  const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-  const gstAmount = cart.reduce(
-    (sum, item) => sum + (item.total * item.gstRate) / 100,
-    0
-  );
-  const total = subtotal + gstAmount;
+  // Calculate totals with memoization to prevent unnecessary recalculations
+  const { subtotal, gstAmount, total } = useMemo(() => {
+    const sub = cart.reduce((sum, item) => sum + item.total, 0);
+    const gst = cart.reduce((sum, item) => sum + (item.total * item.gstRate) / 100, 0);
+    return { subtotal: sub, gstAmount: gst, total: sub + gst };
+  }, [cart]);
 
   // Handle voice result with Smart NLP - Conversational Flow
   const handleVoiceResult = useCallback(

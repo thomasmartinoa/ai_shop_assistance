@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { detectIntent, isDialogflowConfigured, type DialogflowResponse, type DialogflowIntentType, type DialogflowEntity } from './dialogflow';
+import { detectIntentEnhanced, validateIntent } from './enhanced-matcher';
 
 /**
  * Smart NLP Hook
@@ -206,16 +207,34 @@ function extractLocalEntities(text: string): DialogflowEntity {
 }
 
 /**
- * Detect intent using local pattern matching
+ * Detect intent using local pattern matching with enhanced fuzzy matching
  */
 function detectLocalIntent(text: string): NLPResult {
+  console.log('🧠 NLP: Detecting intent for:', text);
+  
+  // First try enhanced matcher (with fuzzy matching and better entity extraction)
+  const enhanced = detectIntentEnhanced(text);
+  
+  // If enhanced matcher found something with decent confidence, use it
+  if (enhanced.confidence >= 0.6 && validateIntent(enhanced.intent, enhanced.entities)) {
+    console.log('🧠 NLP: Enhanced matcher success -', enhanced.intent, 'confidence:', enhanced.confidence);
+    return {
+      intent: enhanced.intent,
+      confidence: enhanced.confidence,
+      entities: enhanced.entities,
+      source: 'local',
+      rawQuery: text,
+      fulfillmentText: generateLocalResponse(enhanced.intent, enhanced.entities),
+    };
+  }
+  
+  // Fallback to old pattern matching (keep for backward compatibility)
+  console.log('🧠 NLP: Trying legacy patterns...');
   const lowerText = text.toLowerCase();
   let bestMatch: { intent: DialogflowIntentType; confidence: number } = {
     intent: 'fallback',
     confidence: 0,
   };
-  
-  console.log('🧠 NLP: Detecting intent for:', text);
   
   // Check each pattern
   for (const [intent, patterns] of Object.entries(MALAYALAM_PATTERNS)) {
@@ -223,7 +242,7 @@ function detectLocalIntent(text: string): NLPResult {
       if (pattern.test(text)) {
         // Calculate confidence based on match quality
         const confidence = 0.7; // Base confidence for local matching
-        console.log('🧠 NLP: Pattern matched -', intent, 'confidence:', confidence);
+        console.log('🧠 NLP: Legacy pattern matched -', intent, 'confidence:', confidence);
         if (confidence > bestMatch.confidence) {
           bestMatch = {
             intent: intent as DialogflowIntentType,
@@ -235,7 +254,7 @@ function detectLocalIntent(text: string): NLPResult {
     }
   }
   
-  // Extract entities
+  // Extract entities using old method
   const entities = extractLocalEntities(text);
   
   console.log('🧠 NLP: Extracted entities:', entities);
@@ -245,15 +264,26 @@ function detectLocalIntent(text: string): NLPResult {
     bestMatch.confidence = Math.min(bestMatch.confidence + 0.1, 0.9);
   }
   
+  // Use enhanced entities if better
+  const finalEntities = (enhanced.entities.product && !entities.product) 
+    ? { ...entities, ...enhanced.entities }
+    : entities;
+  
+  // Use enhanced intent if legacy pattern matching failed
+  if (bestMatch.confidence < enhanced.confidence) {
+    bestMatch.intent = enhanced.intent;
+    bestMatch.confidence = enhanced.confidence;
+  }
+  
   console.log('🧠 NLP: Final result - intent:', bestMatch.intent, 'confidence:', bestMatch.confidence);
   
   return {
     intent: bestMatch.intent,
     confidence: bestMatch.confidence,
-    entities,
+    entities: finalEntities,
     source: 'local',
     rawQuery: text,
-    fulfillmentText: generateLocalResponse(bestMatch.intent, entities),
+    fulfillmentText: generateLocalResponse(bestMatch.intent, finalEntities),
   };
 }
 
