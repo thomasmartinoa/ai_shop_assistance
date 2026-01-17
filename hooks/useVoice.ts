@@ -43,6 +43,7 @@ export type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking' | 'err
 interface UseVoiceOptions {
   lang?: string;
   continuous?: boolean;
+  speaker?: string;  // Sarvam AI speaker: anushka, manisha, vidya, arya, abhilash, karun, hitesh
   onResult?: (transcript: string, isFinal: boolean) => void;
   onError?: (error: string) => void;
 }
@@ -55,7 +56,7 @@ interface UseVoiceReturn {
   startListening: () => void;
   stopListening: () => void;
   toggleListening: () => void;
-  speak: (text: string, lang?: string) => Promise<void>;
+  speak: (text: string, options?: { lang?: string; speaker?: string }) => Promise<void>;
   cancelSpeech: () => void;
 }
 
@@ -63,6 +64,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
   const {
     lang = VOICE_SETTINGS.lang,
     continuous = VOICE_SETTINGS.continuous,
+    speaker = VOICE_SETTINGS.speaker,  // Default Sarvam AI speaker from constants
     onResult,
     onError,
   } = options;
@@ -293,19 +295,25 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
     }
   }, [startListening, stopListening]);
 
-  // Use server-side TTS API for Malayalam (bypasses CORS and uses proper Malayalam voice)
-  const speakWithGoogleTTS = useCallback(async (text: string, ttsLang: string = 'ml'): Promise<void> => {
-    console.log('🔊 Speaking with server-side TTS API:', text, 'lang:', ttsLang);
+  // Use server-side TTS API for Malayalam with Sarvam AI
+  const speakWithSarvamTTS = useCallback(async (text: string, ttsLang: string = 'ml', ttsSpeaker: string = speaker): Promise<void> => {
+    console.log('🔊 Speaking with Sarvam AI TTS:', text.substring(0, 50));
+    console.log('🔊 Speaker:', ttsSpeaker);
     
     return new Promise(async (resolve) => {
       try {
         setState('speaking');
         
-        // Call our server-side TTS API
+        // Call our server-side TTS API with speaker
         const response = await fetch('/api/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, lang: ttsLang }),
+          body: JSON.stringify({ 
+            text, 
+            lang: ttsLang,
+            speaker: ttsSpeaker.toLowerCase(),  // Ensure lowercase for Sarvam
+            pace: 1.0 
+          }),
         });
 
         if (!response.ok) {
@@ -326,12 +334,14 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
           return;
         }
 
+        console.log('🔊 TTS Response - Provider:', data.provider, '| Speaker:', data.speaker);
+
         // Play the audio from data URL
         const audio = new Audio(data.audioUrl);
         audio.volume = 1.0;
         
         audio.oncanplaythrough = () => {
-          console.log('🔊 Audio ready, playing Malayalam...');
+          console.log('🔊 Audio ready, playing with', data.provider === 'sarvam' ? 'Sarvam AI' : 'Google TTS');
           audio.play().catch(err => {
             console.error('🔊 Play error:', err);
             setState('idle');
@@ -340,11 +350,11 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
         };
         
         audio.onplay = () => {
-          console.log('🔊 Malayalam speech started');
+          console.log('🔊 Speech started (speaker:', data.speaker, ')');
         };
         
         audio.onended = () => {
-          console.log('🔊 Malayalam speech ended');
+          console.log('🔊 Speech ended');
           setState('idle');
           resolve();
         };
@@ -362,7 +372,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
         resolve();
       }
     });
-  }, []);
+  }, [speaker]);
 
   // Fallback browser TTS
   const speakWithBrowserTTS = useCallback(async (text: string, textLang?: string): Promise<void> => {
@@ -404,18 +414,19 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
     });
   }, [lang]);
 
-  // Main speak function - uses Google TTS for Malayalam, browser for others
-  const speak = useCallback(async (text: string, textLang?: string): Promise<void> => {
-    const targetLang = textLang || lang;
+  // Main speak function - uses Sarvam AI TTS for Malayalam, browser for others
+  const speak = useCallback(async (text: string, options?: { lang?: string; speaker?: string }): Promise<void> => {
+    const targetLang = options?.lang || lang;
+    const targetSpeaker = options?.speaker || speaker;
     
-    // Use Google TTS for Malayalam (Chrome doesn't have Malayalam voice)
+    // Use Sarvam AI TTS for Malayalam (Chrome doesn't have Malayalam voice)
     if (targetLang.startsWith('ml') || targetLang === 'ml-IN') {
-      return speakWithGoogleTTS(text, 'ml');
+      return speakWithSarvamTTS(text, 'ml', targetSpeaker);
     }
     
     // Use browser TTS for other languages
     return speakWithBrowserTTS(text, targetLang);
-  }, [lang, speakWithGoogleTTS, speakWithBrowserTTS]);
+  }, [lang, speaker, speakWithSarvamTTS, speakWithBrowserTTS]);
 
   const cancelSpeech = useCallback(() => {
     if (isSpeechSynthesisSupported()) {

@@ -10,7 +10,23 @@ export const VOICE_SETTINGS = {
   continuous: true, // Keep listening until manually stopped
   interimResults: true,
   maxAlternatives: 3,
+  // Sarvam AI TTS settings
+  speaker: 'karun' as const, // Default speaker - lowercase required
 } as const;
+
+// Sarvam AI available speakers for Bulbul v2 model
+// All speaker names MUST be lowercase for the API
+export const SARVAM_SPEAKERS = [
+  { id: 'anushka', name: 'Anushka', gender: 'female' as const, description: 'Clear & Professional' },
+  { id: 'manisha', name: 'Manisha', gender: 'female' as const, description: 'Warm & Friendly' },
+  { id: 'vidya', name: 'Vidya', gender: 'female' as const, description: 'Calm & Clear' },
+  { id: 'arya', name: 'Arya', gender: 'female' as const, description: 'Young & Energetic' },
+  { id: 'abhilash', name: 'Abhilash', gender: 'male' as const, description: 'Deep & Authoritative' },
+  { id: 'karun', name: 'Karun', gender: 'male' as const, description: 'Professional & Clear' },
+  { id: 'hitesh', name: 'Hitesh', gender: 'male' as const, description: 'Friendly & Natural' },
+] as const;
+
+export type SarvamSpeakerId = typeof SARVAM_SPEAKERS[number]['id'];
 
 // GST rates in India
 export const GST_RATES = {

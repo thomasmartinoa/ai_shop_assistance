@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 
+// Sarvam AI speakers - MUST use lowercase names for API
 const SPEAKERS = [
-  { name: 'Anushka', gender: 'Female', description: 'Natural female voice' },
-  { name: 'Manisha', gender: 'Female', description: 'Warm female voice' },
-  { name: 'Vidya', gender: 'Female', description: 'Clear female voice' },
-  { name: 'Arya', gender: 'Female', description: 'Young female voice' },
-  { name: 'Abhilash', gender: 'Male', description: 'Natural male voice' },
-  { name: 'Karun', gender: 'Male', description: 'Deep male voice' },
-  { name: 'Hitesh', gender: 'Male', description: 'Clear male voice' },
+  { id: 'anushka', name: 'Anushka', gender: 'Female', description: 'Clear & Professional' },
+  { id: 'manisha', name: 'Manisha', gender: 'Female', description: 'Warm & Friendly' },
+  { id: 'vidya', name: 'Vidya', gender: 'Female', description: 'Calm & Clear' },
+  { id: 'arya', name: 'Arya', gender: 'Female', description: 'Young & Energetic' },
+  { id: 'abhilash', name: 'Abhilash', gender: 'Male', description: 'Deep & Authoritative' },
+  { id: 'karun', name: 'Karun', gender: 'Male', description: 'Professional & Clear' },
+  { id: 'hitesh', name: 'Hitesh', gender: 'Male', description: 'Friendly & Natural' },
 ];
 
 const SAMPLE_TEXTS = [
@@ -21,13 +22,14 @@ const SAMPLE_TEXTS = [
 ];
 
 export default function TestSarvamPage() {
-  const [selectedSpeaker, setSelectedSpeaker] = useState('Anushka');
+  const [selectedSpeaker, setSelectedSpeaker] = useState('anushka');  // lowercase for API
   const [customText, setCustomText] = useState('');
   const [pace, setPace] = useState(1.0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [result, setResult] = useState<{
     provider?: string;
     format?: string;
+    speaker?: string;
     error?: string;
     time?: number;
   } | null>(null);
@@ -65,6 +67,7 @@ export default function TestSarvamPage() {
         setResult({
           provider: data.provider,
           format: data.format,
+          speaker: data.speaker,
           time: elapsed,
         });
       } else {
@@ -97,6 +100,7 @@ export default function TestSarvamPage() {
                 <p>✅ Audio generated successfully!</p>
                 <p className="text-sm mt-1">
                   Provider: <span className="font-bold">{result.provider === 'sarvam' ? '🌟 Sarvam AI (Generative)' : '🔄 Google Translate (Fallback)'}</span>
+                  {' | '}Speaker: <span className="font-bold">{result.speaker}</span>
                   {' | '}Format: {result.format?.toUpperCase()}
                   {' | '}Time: {result.time}ms
                 </p>
@@ -107,23 +111,26 @@ export default function TestSarvamPage() {
 
         {/* Speaker Selection */}
         <div className="bg-white/10 backdrop-blur rounded-xl p-6 mb-6">
-          <h2 className="text-xl font-semibold text-white mb-4">🗣️ Select Speaker</h2>
+          <h2 className="text-xl font-semibold text-white mb-4">🗣️ Select Speaker (7 Different Voices)</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {SPEAKERS.map((speaker) => (
               <button
-                key={speaker.name}
-                onClick={() => setSelectedSpeaker(speaker.name)}
+                key={speaker.id}
+                onClick={() => setSelectedSpeaker(speaker.id)}  // Use lowercase id
                 className={`p-3 rounded-lg transition-all ${
-                  selectedSpeaker === speaker.name
+                  selectedSpeaker === speaker.id
                     ? 'bg-purple-500 text-white ring-2 ring-purple-300'
                     : 'bg-white/20 text-white hover:bg-white/30'
                 }`}
               >
                 <div className="font-medium">{speaker.name}</div>
-                <div className="text-xs opacity-75">{speaker.gender}</div>
+                <div className="text-xs opacity-75">{speaker.gender} - {speaker.description}</div>
               </button>
             ))}
           </div>
+          <p className="text-purple-300 text-sm mt-3">
+            Currently selected: <span className="font-bold text-white">{SPEAKERS.find(s => s.id === selectedSpeaker)?.name || selectedSpeaker}</span>
+          </p>
         </div>
 
         {/* Pace Control */}

@@ -349,7 +349,7 @@ export default function BillingPage() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => voice.speak('Hello, how can I help you?', 'en-IN')}
+                onClick={() => voice.speak('Hello, how can I help you?', { lang: 'en-IN' })}
               >
                 🔊 Test English TTS
               </Button>

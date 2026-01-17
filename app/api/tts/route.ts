@@ -7,49 +7,65 @@ export const runtime = 'nodejs';
 const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
 const SARVAM_API_URL = 'https://api.sarvam.ai/text-to-speech';
 
-// Available speakers for Malayalam (Bulbul v2)
-// Female: Anushka, Manisha, Vidya, Arya
-// Male: Abhilash, Karun, Hitesh
-type SarvamSpeaker = 'Anushka' | 'Manisha' | 'Vidya' | 'Arya' | 'Abhilash' | 'Karun' | 'Hitesh';
+// Available speakers for Malayalam (Bulbul v2) - MUST BE LOWERCASE
+// Female: anushka, manisha, vidya, arya
+// Male: abhilash, karun, hitesh
+type SarvamSpeaker = 'anushka' | 'manisha' | 'vidya' | 'arya' | 'abhilash' | 'karun' | 'hitesh';
+
+// Valid speakers list for validation
+const VALID_SPEAKERS: SarvamSpeaker[] = ['anushka', 'manisha', 'vidya', 'arya', 'abhilash', 'karun', 'hitesh'];
 
 interface SarvamTTSRequest {
-  inputs: string[];
+  text: string;                    // Single text input (not array for real-time API)
   target_language_code: string;
   speaker: SarvamSpeaker;
   model: string;
   pitch?: number;       // -0.5 to 0.5, default 0
-  pace?: number;        // 0.5 to 2.0, default 1
-  loudness?: number;    // 0.5 to 2.0, default 1
+  pace?: number;        // 0.5 to 2.0, default 1.0
+  loudness?: number;    // 0.5 to 2.0, default 1.0
   enable_preprocessing?: boolean;
+  audio_format?: string; // wav, mp3, etc.
 }
 
 interface SarvamTTSResponse {
-  audios: string[];  // Base64 encoded WAV audio
+  audios: string[];  // Base64 encoded audio
+  request_id?: string;
 }
 
 // Generate speech using Sarvam AI Bulbul (Generative AI)
 async function generateWithSarvam(
   text: string, 
-  speaker: SarvamSpeaker = 'Anushka',
+  speaker: SarvamSpeaker = 'anushka',
   pace: number = 1.0
-): Promise<{ audioUrl: string; format: string } | null> {
+): Promise<{ audioUrl: string; format: string; speaker: string } | null> {
   if (!SARVAM_API_KEY) {
     console.log('🔊 Sarvam API key not configured, will use fallback');
     return null;
   }
 
+  // Validate and normalize speaker name (must be lowercase)
+  const normalizedSpeaker = speaker.toLowerCase() as SarvamSpeaker;
+  if (!VALID_SPEAKERS.includes(normalizedSpeaker)) {
+    console.log(`🔊 Invalid speaker "${speaker}", using default "anushka"`);
+  }
+  const finalSpeaker = VALID_SPEAKERS.includes(normalizedSpeaker) ? normalizedSpeaker : 'anushka';
+
   try {
     console.log('🔊 Sarvam AI: Generating speech with Bulbul v2...');
-    console.log('🔊 Speaker:', speaker, '| Pace:', pace);
+    console.log('🔊 Text:', text.substring(0, 50) + (text.length > 50 ? '...' : ''));
+    console.log('🔊 Speaker:', finalSpeaker, '| Pace:', pace);
 
     const requestBody: SarvamTTSRequest = {
-      inputs: [text],
-      target_language_code: 'ml-IN',  // Malayalam
-      speaker: speaker,
+      text: text,                          // Single text, not array
+      target_language_code: 'ml-IN',       // Malayalam
+      speaker: finalSpeaker,               // Lowercase speaker name
       model: 'bulbul:v2',
-      pace: pace,
+      pace: Math.max(0.5, Math.min(2.0, pace)),  // Clamp between 0.5-2.0
       enable_preprocessing: true,
+      audio_format: 'wav',
     };
+
+    console.log('🔊 Sarvam Request:', JSON.stringify(requestBody, null, 2));
 
     const response = await fetch(SARVAM_API_URL, {
       method: 'POST',
@@ -67,6 +83,7 @@ async function generateWithSarvam(
     }
 
     const data: SarvamTTSResponse = await response.json();
+    console.log('🔊 Sarvam Response received, request_id:', data.request_id);
     
     if (!data.audios || data.audios.length === 0) {
       console.error('🔊 Sarvam API returned no audio');
@@ -76,11 +93,12 @@ async function generateWithSarvam(
     const base64Audio = data.audios[0];
     const audioDataUrl = `data:audio/wav;base64,${base64Audio}`;
 
-    console.log('🔊 Sarvam AI: Successfully generated generative audio');
+    console.log('🔊 Sarvam AI: Successfully generated audio with speaker:', finalSpeaker);
     
     return {
       audioUrl: audioDataUrl,
       format: 'wav',
+      speaker: finalSpeaker,
     };
   } catch (error) {
     console.error('🔊 Sarvam AI error:', error);
@@ -89,7 +107,7 @@ async function generateWithSarvam(
 }
 
 // Fallback: Google Translate TTS (robotic but reliable)
-async function generateWithGoogleTranslate(text: string, lang: string = 'ml'): Promise<{ audioUrl: string; format: string } | null> {
+async function generateWithGoogleTranslate(text: string, lang: string = 'ml'): Promise<{ audioUrl: string; format: string; speaker: string } | null> {
   try {
     console.log('🔊 Fallback: Using Google Translate TTS...');
     
@@ -117,6 +135,7 @@ async function generateWithGoogleTranslate(text: string, lang: string = 'ml'): P
     return {
       audioUrl: audioDataUrl,
       format: 'mp3',
+      speaker: 'google-default',
     };
   } catch (error) {
     console.error('🔊 Google Translate error:', error);
@@ -126,7 +145,7 @@ async function generateWithGoogleTranslate(text: string, lang: string = 'ml'): P
 
 export async function POST(request: NextRequest) {
   try {
-    const { text, lang = 'ml', speaker = 'Anushka', pace = 1.0 } = await request.json();
+    const { text, lang = 'ml', speaker = 'anushka', pace = 1.0 } = await request.json();
 
     if (!text) {
       return NextResponse.json(
@@ -135,7 +154,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🔊 TTS API: Generating speech for:', text.substring(0, 50) + (text.length > 50 ? '...' : ''));
+    console.log('🔊 TTS API Request:');
+    console.log('  - Text:', text.substring(0, 50) + (text.length > 50 ? '...' : ''));
+    console.log('  - Speaker:', speaker);
+    console.log('  - Pace:', pace);
 
     // Try Sarvam AI first (generative, natural voice)
     let result = await generateWithSarvam(text, speaker as SarvamSpeaker, pace);
@@ -154,13 +176,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🔊 TTS API: Successfully generated audio using:', provider);
+    console.log('🔊 TTS API: Successfully generated audio using:', provider, 'speaker:', (result as { speaker?: string }).speaker || 'N/A');
 
     return NextResponse.json({
       success: true,
       audioUrl: result.audioUrl,
       format: result.format,
       provider: provider,
+      speaker: (result as { speaker?: string }).speaker || speaker,
     });
 
   } catch (error) {
