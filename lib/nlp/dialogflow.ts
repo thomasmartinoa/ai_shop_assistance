@@ -1,18 +1,5 @@
 'use client';
 
-/**
- * Dialogflow ES Integration for Malayalam Voice Commerce
- * 
- * This module handles communication with Dialogflow for intent detection
- * and entity extraction from Malayalam voice commands.
- * 
- * Setup Required:
- * 1. Create Google Cloud Project: https://console.cloud.google.com
- * 2. Enable Dialogflow API
- * 3. Create Dialogflow Agent with Malayalam (ml) language
- * 4. Create intents (see DIALOGFLOW_SETUP.md)
- * 5. Get credentials and add to .env.local
- */
 
 // Intent types that Dialogflow will detect
 export type DialogflowIntentType =

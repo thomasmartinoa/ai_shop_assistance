@@ -2,17 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-/**
- * TTS API Route - Server-side proxy for Malayalam text-to-speech
- * 
- * This bypasses CORS issues by fetching TTS audio server-side.
- * Currently uses Google Translate TTS as a temporary solution.
- * 
- * TODO: Replace with Google Cloud Text-to-Speech API for production:
- * - More reliable and officially supported
- * - Better voice quality (WaveNet voices)
- * - Requires GOOGLE_TTS_API_KEY in .env.local
- */
+
 export async function POST(request: NextRequest) {
   try {
     const { text, lang = 'ml' } = await request.json();
