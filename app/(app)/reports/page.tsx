@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { getSalesStats, getTopProducts, type TopProduct } from '@/lib/supabase/transactions';
 import {
   TrendingUp,
   TrendingDown,
@@ -11,31 +13,74 @@ import {
   ShoppingCart,
   Calendar,
   Download,
+  Loader2,
 } from 'lucide-react';
-
-// Mock data
-const MOCK_STATS = {
-  today: { sales: 4520, orders: 23, avgOrder: 196 },
-  week: { sales: 28450, orders: 142, avgOrder: 200 },
-  month: { sales: 124800, orders: 623, avgOrder: 200 },
-};
-
-const MOCK_TOP_PRODUCTS = [
-  { name: 'Rice (അരി)', qty: 120, revenue: 6000 },
-  { name: 'Sugar (പഞ്ചസാര)', qty: 85, revenue: 3825 },
-  { name: 'Coconut Oil (വെളിച്ചെണ്ണ)', qty: 45, revenue: 6750 },
-  { name: 'Tea Powder (ചായപ്പൊടി)', qty: 38, revenue: 6840 },
-  { name: 'Soap (സോപ്പ്)', qty: 72, revenue: 2520 },
-];
 
 type Period = 'today' | 'week' | 'month';
 
 export default function ReportsPage() {
+  const { shop } = useAuth();
   const [period, setPeriod] = useState<Period>('today');
-  const stats = MOCK_STATS[period];
+  const [loading, setLoading] = useState(true);
+  const [salesStats, setSalesStats] = useState({
+    today: 0,
+    yesterday: 0,
+    thisWeek: 0,
+    lastWeek: 0,
+    thisMonth: 0,
+    lastMonth: 0,
+  });
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
 
-  // Calculate growth (mock)
-  const growth = period === 'today' ? 12 : period === 'week' ? 8 : 15;
+  // Load sales data
+  useEffect(() => {
+    if (!shop?.id) return;
+
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [stats, products] = await Promise.all([
+          getSalesStats(shop.id),
+          getTopProducts(shop.id, period, 5),
+        ]);
+        setSalesStats(stats);
+        setTopProducts(products);
+      } catch (error) {
+        console.error('Error loading reports:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [shop?.id, period]);
+
+  // Get stats for selected period
+  const stats = {
+    sales: period === 'today' ? salesStats.today : period === 'week' ? salesStats.thisWeek : salesStats.thisMonth,
+    orders: 0, // TODO: Track order counts in transactions
+    avgOrder: 0, // TODO: Calculate from transactions
+  };
+
+  // Calculate growth
+  const getGrowth = () => {
+    switch (period) {
+      case 'today':
+        return salesStats.yesterday > 0 
+          ? ((salesStats.today - salesStats.yesterday) / salesStats.yesterday * 100)
+          : 0;
+      case 'week':
+        return salesStats.lastWeek > 0 
+          ? ((salesStats.thisWeek - salesStats.lastWeek) / salesStats.lastWeek * 100)
+          : 0;
+      case 'month':
+        return salesStats.lastMonth > 0 
+          ? ((salesStats.thisMonth - salesStats.lastMonth) / salesStats.lastMonth * 100)
+          : 0;
+    }
+  };
+
+  const growth = getGrowth();
 
   return (
     <div className="space-y-6">
@@ -77,21 +122,30 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatCurrency(stats.sales)}</p>
-            <div className="flex items-center gap-1 mt-1">
-              {growth >= 0 ? (
-                <TrendingUp className="w-4 h-4 text-green-500" />
-              ) : (
-                <TrendingDown className="w-4 h-4 text-red-500" />
-              )}
-              <span
-                className={`text-sm ${
-                  growth >= 0 ? 'text-green-500' : 'text-red-500'
-                }`}
-              >
-                {growth}% vs last {period}
-              </span>
-            </div>
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span className="text-sm text-muted-foreground">Loading...</span>
+              </div>
+            ) : (
+              <>
+                <p className="text-3xl font-bold">{formatCurrency(stats.sales)}</p>
+                <div className="flex items-center gap-1 mt-1">
+                  {growth >= 0 ? (
+                    <TrendingUp className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4 text-red-500" />
+                  )}
+                  <span
+                    className={`text-sm ${
+                      growth >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}
+                  >
+                    {Math.abs(growth).toFixed(1)}% vs {period === 'today' ? 'yesterday' : period === 'week' ? 'last week' : 'last month'}
+                  </span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -103,10 +157,16 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{stats.orders}</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              transactions completed
-            </p>
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <p className="text-3xl font-bold">{stats.orders}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  transactions completed
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -118,8 +178,14 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatCurrency(stats.avgOrder)}</p>
-            <p className="text-sm text-muted-foreground mt-1">per transaction</p>
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <p className="text-3xl font-bold">{formatCurrency(stats.avgOrder)}</p>
+                <p className="text-sm text-muted-foreground mt-1">per transaction</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -130,27 +196,40 @@ export default function ReportsPage() {
           <CardTitle>Top Selling Products</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {MOCK_TOP_PRODUCTS.map((product, index) => (
-              <div
-                key={product.name}
-                className="flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-xs font-medium">
-                    {index + 1}
-                  </span>
-                  <span className="font-medium">{product.name}</span>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : topProducts.length === 0 ? (
+            <p className="text-center py-8 text-muted-foreground">
+              No sales data available for this period
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {topProducts.map((product, index) => (
+                <div
+                  key={`${product.product_id}-${index}`}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-xs font-medium">
+                      {index + 1}
+                    </span>
+                    <div>
+                      <p className="font-medium">{product.name_ml}</p>
+                      <p className="text-xs text-muted-foreground">{product.name_en}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{formatCurrency(product.total_revenue)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {product.total_quantity} sold
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold">{formatCurrency(product.revenue)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {product.qty} sold
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -47,3 +47,6 @@ export function getSupabaseClient() {
   }
   return client;
 }
+
+// Export a default supabase instance
+export const supabase = getSupabaseClient();

@@ -62,36 +62,35 @@ function generateDemoSalesData(): SalesSummary {
 }
 
 // Generate demo response when API quota is exceeded
-function generateDemoResponse(query: string, salesData: SalesSummary): string {
+function generateDemoResponse(query: string, salesData: SalesSummary, inventory: ProductContext[]): string {
   const queryLower = query.toLowerCase();
-  
-  // Product database with stock info
-  const productStock: Record<string, { ml: string; en: string; stock: number; unit: string; status: string }> = {
-    'rice': { ml: 'അരി', en: 'Rice', stock: 45, unit: 'kg', status: '✅ Good' },
-    'അരി': { ml: 'അരി', en: 'Rice', stock: 45, unit: 'kg', status: '✅ Good' },
-    'milk': { ml: 'പാൽ', en: 'Milk', stock: 28, unit: 'liters', status: '✅ Good' },
-    'പാൽ': { ml: 'പാൽ', en: 'Milk', stock: 28, unit: 'liters', status: '✅ Good' },
-    'sugar': { ml: 'പഞ്ചസാര', en: 'Sugar', stock: 5, unit: 'kg', status: '⚠️ Low' },
-    'പഞ്ചസാര': { ml: 'പഞ്ചസാര', en: 'Sugar', stock: 5, unit: 'kg', status: '⚠️ Low' },
-    'oil': { ml: 'എണ്ണ', en: 'Oil', stock: 3, unit: 'liters', status: '⚠️ Low' },
-    'എണ്ണ': { ml: 'എണ്ണ', en: 'Oil', stock: 3, unit: 'liters', status: '⚠️ Low' },
-    'tea': { ml: 'ചായപ്പൊടി', en: 'Tea', stock: 2, unit: 'packets', status: '⚠️ Low' },
-    'ചായപ്പൊടി': { ml: 'ചായപ്പൊടി', en: 'Tea', stock: 2, unit: 'packets', status: '⚠️ Low' },
-    'soap': { ml: 'സോപ്പ്', en: 'Soap', stock: 15, unit: 'units', status: '✅ Good' },
-    'സോപ്പ്': { ml: 'സോപ്പ്', en: 'Soap', stock: 15, unit: 'units', status: '✅ Good' },
-  };
   
   // Check for specific product stock query
   if (queryLower.includes('stock') || queryLower.includes('കുറവ') || queryLower.includes('available')) {
-    // Check if asking about a specific product
-    for (const [key, product] of Object.entries(productStock)) {
-      if (queryLower.includes(key)) {
-        return `📦 ${product.ml} (${product.en}) Stock:\n\nCurrent: ${product.stock} ${product.unit}\nStatus: ${product.status}\n\n${product.stock <= 5 ? '⚠️ Stock കുറവാണ്! Soon reorder ചെയ്യുക.' : '✅ Stock നല്ല രീതിയിൽ ഉണ്ട്! 👍'}`;
+    // Check if asking about a specific product from actual inventory
+    for (const product of inventory) {
+      const nameEnLower = product.name_en.toLowerCase();
+      const nameMlLower = product.name_ml.toLowerCase();
+      
+      if (queryLower.includes(nameEnLower) || queryLower.includes(nameMlLower) || 
+          queryLower.includes(product.name_en.toLowerCase()) || 
+          queryLower.includes(product.name_ml)) {
+        const isLowStock = product.stock <= product.min_stock;
+        const status = isLowStock ? '⚠️ Low' : '✅ Good';
+        return `📦 ${product.name_ml} (${product.name_en}) Stock:\n\nCurrent: ${product.stock} ${product.unit}\nMin required: ${product.min_stock} ${product.unit}\nPrice: ₹${product.price}/${product.unit}\nStatus: ${status}\n\n${isLowStock ? '⚠️ Stock കുറവാണ്! Soon reorder ചെയ്യുക.' : '✅ Stock നല്ല രീതിയിൽ ഉണ്ട്! 👍'}`;
       }
     }
     
-    // General low stock alert if no specific product
-    return `⚠️ Low Stock Alert:\n\n1. പഞ്ചസാര (Sugar) - 5 kg മാത്രം\n2. എണ്ണ (Oil) - 3 liters\n3. ചായപ്പൊടി (Tea) - 2 packets\n\nഈ items ഉടൻ order ചെയ്യുക! 📦`;
+    // General low stock alert using real inventory
+    const lowStockItems = inventory.filter(p => p.stock <= p.min_stock);
+    if (lowStockItems.length > 0) {
+      const itemsList = lowStockItems.slice(0, 5).map((p, i) => 
+        `${i + 1}. ${p.name_ml} (${p.name_en}) - ${p.stock} ${p.unit} മാത്രം`
+      ).join('\n');
+      return `⚠️ Low Stock Alert:\n\n${itemsList}\n\nഈ items ഉടൻ order ചെയ്യുക! 📦`;
+    }
+    
+    return `✅ എല്ലാ items നും നല്ല stock ഉണ്ട്!\n\nTotal items: ${inventory.length}\nAll stock levels are good. 👍`;
   }
   
   // Top sellers query
@@ -188,16 +187,18 @@ export async function POST(request: NextRequest) {
   let query = '';
   let context: CopilotRequest['context'] = {};
   let salesData: SalesSummary = generateDemoSalesData();
+  let inventory: ProductContext[] = [];
   
   try {
     const body: CopilotRequest = await request.json();
     query = body.query || '';
     context = body.context || {};
     salesData = context.recentSales || generateDemoSalesData();
+    inventory = context.inventory || [];
     
     // Check if Gemini is configured
     if (!isGeminiConfigured()) {
-      const demoResponse = generateDemoResponse(query, salesData);
+      const demoResponse = generateDemoResponse(query, salesData, inventory);
       return NextResponse.json({
         success: true,
         response: demoResponse,
@@ -263,7 +264,7 @@ export async function POST(request: NextRequest) {
     
     // For any API errors, use demo fallback to keep the app working
     console.log('🤖 Using demo fallback...');
-    const demoResponse = generateDemoResponse(query, salesData);
+    const demoResponse = generateDemoResponse(query, salesData, inventory);
     
     return NextResponse.json({
       success: true,

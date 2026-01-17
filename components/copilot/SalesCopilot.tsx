@@ -78,12 +78,12 @@ export function SalesCopilot({ products, cart, isExpanded = true, onToggleExpand
   };
 
   return (
-    <Card className="flex flex-col h-full border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+    <Card className="flex flex-col h-full">
       {/* Header */}
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-primary" />
           </div>
           <div>
             <CardTitle className="text-lg">കടസഹായി</CardTitle>
@@ -122,7 +122,7 @@ export function SalesCopilot({ products, cart, isExpanded = true, onToggleExpand
                     key={q.label}
                     onClick={() => copilot.sendQuery(q.query)}
                     disabled={copilot.isLoading}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-muted hover:bg-muted/80 text-foreground rounded-md transition-colors disabled:opacity-50 border"
                   >
                     <span>{q.icon}</span>
                     <span>{q.label}</span>
@@ -136,7 +136,7 @@ export function SalesCopilot({ products, cart, isExpanded = true, onToggleExpand
           <div className="flex-1 overflow-y-auto space-y-3 min-h-[200px] max-h-[400px]">
             {copilot.messages.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
-                <Sparkles className="w-8 h-8 mx-auto mb-2 text-purple-400" />
+                <Sparkles className="w-8 h-8 mx-auto mb-2 text-primary" />
                 <p className="text-sm">നമസ്കാരം! 🙏</p>
                 <p className="text-xs mt-1">Business insights-ന് വേണ്ടി ചോദിക്കൂ</p>
               </div>
@@ -149,25 +149,25 @@ export function SalesCopilot({ products, cart, isExpanded = true, onToggleExpand
                   <div
                     className={`max-w-[85%] rounded-lg px-3 py-2 ${
                       msg.role === 'user'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-white border border-purple-100 shadow-sm'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted border shadow-sm'
                     }`}
                   >
                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     
                     {/* Sales data summary card */}
                     {msg.role === 'assistant' && msg.salesData && (
-                      <div className="mt-2 pt-2 border-t border-purple-100">
+                      <div className="mt-2 pt-2 border-t">
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           {msg.salesData.today !== undefined && (
-                            <div className="bg-green-50 p-1.5 rounded">
-                              <span className="text-green-600">Today:</span>
+                            <div className="bg-green-50 dark:bg-green-950 p-1.5 rounded border border-green-200 dark:border-green-800">
+                              <span className="text-green-600 dark:text-green-400">Today:</span>
                               <span className="font-semibold ml-1">₹{msg.salesData.today.toLocaleString('en-IN')}</span>
                             </div>
                           )}
                           {msg.salesData.yesterday !== undefined && (
-                            <div className="bg-blue-50 p-1.5 rounded">
-                              <span className="text-blue-600">Yesterday:</span>
+                            <div className="bg-blue-50 dark:bg-blue-950 p-1.5 rounded border border-blue-200 dark:border-blue-800">
+                              <span className="text-blue-600 dark:text-blue-400">Yesterday:</span>
                               <span className="font-semibold ml-1">₹{msg.salesData.yesterday.toLocaleString('en-IN')}</span>
                             </div>
                           )}
@@ -179,7 +179,7 @@ export function SalesCopilot({ products, cart, isExpanded = true, onToggleExpand
                     {msg.role === 'assistant' && (
                       <button
                         onClick={() => speakMessage(msg.content)}
-                        className="mt-1 text-xs text-purple-500 hover:text-purple-700 flex items-center gap-1"
+                        className="mt-1 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                       >
                         <Volume2 className="w-3 h-3" />
                         <span>Speak</span>
@@ -193,12 +193,12 @@ export function SalesCopilot({ products, cart, isExpanded = true, onToggleExpand
             {/* Loading indicator */}
             {copilot.isLoading && (
               <div className="flex justify-start">
-                <div className="bg-white border border-purple-100 rounded-lg px-3 py-2 shadow-sm">
+                <div className="bg-muted border rounded-lg px-3 py-2 shadow-sm">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                     <span className="text-xs text-muted-foreground">Thinking...</span>
                   </div>
@@ -242,7 +242,6 @@ export function SalesCopilot({ products, cart, isExpanded = true, onToggleExpand
             <Button
               onClick={() => handleSend()}
               disabled={!inputValue.trim() || copilot.isLoading}
-              className="bg-purple-600 hover:bg-purple-700"
             >
               <Send className="h-4 w-4" />
             </Button>

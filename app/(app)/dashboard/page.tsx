@@ -31,13 +31,11 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome message */}
+      {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold">
-          Welcome back{shop?.name ? `, ${shop.name}` : ''}!
-        </h2>
+        <h2 className="text-2xl font-bold">Dashboard</h2>
         <p className="text-muted-foreground">
-          Here's what's happening with your shop today.
+          Welcome back{shop?.name ? `, ${shop.name}` : ''}! Here's what's happening with your shop today.
         </p>
       </div>
 
@@ -149,7 +147,8 @@ export default function DashboardPage() {
       )}
 
       {/* AI Sales Copilot */}
-      <div className="mt-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Sales Copilot</h3>
         <SalesCopilot products={products} />
       </div>
     </div>

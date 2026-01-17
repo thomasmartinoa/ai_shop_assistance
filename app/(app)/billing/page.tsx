@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { ML_RESPONSES } from '@/lib/constants';
 import { useAuth } from '@/contexts/AuthContext';
+import { createTransaction, type TransactionItem } from '@/lib/supabase/transactions';
 import {
   Trash2,
   QrCode,
@@ -49,6 +50,7 @@ export default function BillingPage() {
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [conversationState, setConversationState] = useState<ConversationState>('idle');
   const [lastAddedItem, setLastAddedItem] = useState<string | null>(null);
+  const [isCompletingTransaction, setIsCompletingTransaction] = useState(false);
 
   // Create a ref for the voice API to break circular dependency
   const voiceApiRef = useRef<{
@@ -72,6 +74,56 @@ export default function BillingPage() {
     const gst = cart.reduce((sum, item) => sum + (item.total * item.gstRate) / 100, 0);
     return { subtotal: sub, gstAmount: gst, total: sub + gst };
   }, [cart]);
+
+  // Complete transaction and update inventory
+  const completeTransaction = useCallback(async (paymentMethod: 'cash' | 'upi') => {
+    if (cart.length === 0 || !shop?.id) return;
+
+    setIsCompletingTransaction(true);
+
+    try {
+      // Convert cart items to transaction format
+      const transactionItems: TransactionItem[] = cart.map(item => ({
+        product_id: item.id,
+        name: item.name,
+        name_ml: item.nameMl,
+        quantity: item.quantity,
+        unit: item.unit,
+        price: item.price,
+        gst_rate: item.gstRate,
+        gst_amount: (item.total * item.gstRate) / 100,
+        total: item.total + (item.total * item.gstRate) / 100,
+      }));
+
+      // Create transaction in database
+      const result = await createTransaction({
+        shop_id: shop.id,
+        items: transactionItems,
+        subtotal,
+        gst_amount: gstAmount,
+        discount: 0,
+        total,
+        payment_method: paymentMethod,
+        payment_status: 'completed',
+      });
+
+      if (result.success) {
+        // Success - clear cart and reload products to update stock
+        setCart([]);
+        setConversationState('idle');
+        await loadProducts(); // Reload products to get updated stock
+        speakText(`ബിൽ പൂർത്തിയായി. ${Math.round(total)} രൂപ ${paymentMethod === 'cash' ? 'കാഷ്' : 'UPI'}-ൽ കിട്ടി. നന്ദി!`);
+      } else {
+        console.error('Transaction failed:', result.error);
+        speakText('ക്ഷമിക്കണം, ബിൽ save ചെയ്യാൻ പറ്റിയില്ല');
+      }
+    } catch (error) {
+      console.error('Transaction error:', error);
+      speakText('എറർ ഉണ്ടായി');
+    } finally {
+      setIsCompletingTransaction(false);
+    }
+  }, [cart, shop, subtotal, gstAmount, total, speakText, loadProducts]);
 
   // Handle voice result with Smart NLP - Conversational Flow
   const handleVoiceResult = useCallback(
@@ -457,6 +509,7 @@ export default function BillingPage() {
             size="lg"
             className="flex-col gap-1 h-auto py-4"
             onClick={() => setShowQR(true)}
+            disabled={isCompletingTransaction}
           >
             <QrCode className="w-6 h-6" />
             <span>UPI Payment</span>
@@ -464,14 +517,11 @@ export default function BillingPage() {
           <Button
             size="lg"
             className="flex-col gap-1 h-auto py-4"
-            onClick={() => {
-              // TODO: Complete transaction and print
-              alert('Bill completed!');
-              setCart([]);
-            }}
+            onClick={() => completeTransaction('cash')}
+            disabled={isCompletingTransaction}
           >
             <IndianRupee className="w-6 h-6" />
-            <span>Cash Payment</span>
+            <span>{isCompletingTransaction ? 'Processing...' : 'Cash Payment'}</span>
           </Button>
         </div>
       )}
@@ -520,16 +570,17 @@ export default function BillingPage() {
                 {!paymentComplete && (
                   <Button
                     className="flex-1"
-                    onClick={() => {
+                    disabled={isCompletingTransaction}
+                    onClick={async () => {
                       setPaymentComplete(true);
+                      await completeTransaction('upi');
                       setTimeout(() => {
                         setShowQR(false);
                         setPaymentComplete(false);
-                        setCart([]);
                       }, 2000);
                     }}
                   >
-                    Mark as Paid
+                    {isCompletingTransaction ? 'Processing...' : 'Mark as Paid'}
                   </Button>
                 )}
               </div>
