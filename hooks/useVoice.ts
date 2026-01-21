@@ -293,9 +293,49 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
     }
   }, [startListening, stopListening]);
 
-  // Use server-side TTS API for Malayalam (bypasses CORS and uses proper Malayalam voice)
+  // Fallback browser TTS (no dependencies - base fallback)
+  const speakWithBrowserTTS = useCallback(async (text: string, textLang?: string): Promise<void> => {
+    if (!isSpeechSynthesisSupported()) {
+      console.warn('🔊 Speech synthesis not supported');
+      return;
+    }
+
+    console.log('🔊 Speaking with browser TTS:', text);
+
+    return new Promise((resolve) => {
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voices = window.speechSynthesis.getVoices();
+      const targetLang = textLang || lang;
+      
+      // Try to find best available voice
+      let selectedVoice = voices.find(v => v.lang.startsWith('ml')) ||
+                          voices.find(v => v.lang.startsWith('hi')) ||
+                          voices.find(v => v.lang === 'en-IN') ||
+                          voices.find(v => v.lang.startsWith('en'));
+
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        console.log('🔊 Using browser voice:', selectedVoice.name, selectedVoice.lang);
+      }
+
+      utterance.lang = targetLang;
+      utterance.rate = 0.85;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+
+      utterance.onstart = () => setState('speaking');
+      utterance.onend = () => { setState('idle'); resolve(); };
+      utterance.onerror = () => { setState('idle'); resolve(); };
+
+      window.speechSynthesis.speak(utterance);
+    });
+  }, [lang]);
+
+  // Fallback: Use server-side Google TTS API for Malayalam
   const speakWithGoogleTTS = useCallback(async (text: string, ttsLang: string = 'ml'): Promise<void> => {
-    console.log('🔊 Speaking with server-side TTS API:', text, 'lang:', ttsLang);
+    console.log('🔊 Speaking with Google TTS (fallback):', text, 'lang:', ttsLang);
     
     return new Promise(async (resolve) => {
       try {
@@ -340,11 +380,11 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
         };
         
         audio.onplay = () => {
-          console.log('🔊 Malayalam speech started');
+          console.log('🔊 Google TTS speech started');
         };
         
         audio.onended = () => {
-          console.log('🔊 Malayalam speech ended');
+          console.log('🔊 Google TTS speech ended');
           setState('idle');
           resolve();
         };
@@ -357,65 +397,101 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
         };
         
       } catch (error) {
-        console.error('🔊 TTS API error:', error);
+        console.error('🔊 Google TTS API error:', error);
         await speakWithBrowserTTS(text, ttsLang);
         resolve();
       }
     });
-  }, []);
+  }, [speakWithBrowserTTS]);
 
-  // Fallback browser TTS
-  const speakWithBrowserTTS = useCallback(async (text: string, textLang?: string): Promise<void> => {
-    if (!isSpeechSynthesisSupported()) {
-      console.warn('🔊 Speech synthesis not supported');
-      return;
-    }
+  // Use Sarvam AI TTS for Malayalam (best quality natural voice)
+  const speakWithSarvamTTS = useCallback(async (text: string, ttsLang: string = 'ml'): Promise<void> => {
+    console.log('🔊 Speaking with Sarvam AI TTS:', text, 'lang:', ttsLang);
+    
+    return new Promise(async (resolve) => {
+      try {
+        setState('speaking');
+        
+        // Call Sarvam TTS API
+        const response = await fetch('/api/sarvam-tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, lang: ttsLang }),
+        });
 
-    console.log('🔊 Speaking with browser TTS:', text);
+        if (!response.ok) {
+          const data = await response.json();
+          console.error('🔊 Sarvam TTS API error:', response.status, data);
+          
+          // Check if we should fallback
+          if (data.fallback) {
+            console.log('🔊 Falling back to Google TTS...');
+            await speakWithGoogleTTS(text, ttsLang);
+            resolve();
+            return;
+          }
+        }
 
-    return new Promise((resolve) => {
-      window.speechSynthesis.cancel();
+        const data = await response.json();
+        
+        if (!data.audioUrl) {
+          console.error('🔊 No audio URL in Sarvam response');
+          await speakWithGoogleTTS(text, ttsLang);
+          resolve();
+          return;
+        }
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voices = window.speechSynthesis.getVoices();
-      const targetLang = textLang || lang;
-      
-      // Try to find best available voice
-      let selectedVoice = voices.find(v => v.lang.startsWith('ml')) ||
-                          voices.find(v => v.lang.startsWith('hi')) ||
-                          voices.find(v => v.lang === 'en-IN') ||
-                          voices.find(v => v.lang.startsWith('en'));
+        console.log('🔊 Playing Sarvam AI Malayalam audio...');
 
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-        console.log('🔊 Using browser voice:', selectedVoice.name, selectedVoice.lang);
+        // Play the audio from data URL
+        const audio = new Audio(data.audioUrl);
+        audio.volume = 1.0;
+        
+        audio.oncanplaythrough = () => {
+          console.log('🔊 Sarvam audio ready, playing...');
+          audio.play().catch(err => {
+            console.error('🔊 Sarvam play error:', err);
+            setState('idle');
+            resolve();
+          });
+        };
+        
+        audio.onplay = () => {
+          console.log('🔊 Sarvam Malayalam speech started');
+        };
+        
+        audio.onended = () => {
+          console.log('🔊 Sarvam Malayalam speech ended');
+          setState('idle');
+          resolve();
+        };
+        
+        audio.onerror = (e) => {
+          console.error('🔊 Sarvam audio playback error:', e);
+          console.log('🔊 Falling back to Google TTS...');
+          speakWithGoogleTTS(text, ttsLang).then(resolve);
+        };
+        
+      } catch (error) {
+        console.error('🔊 Sarvam TTS error:', error);
+        await speakWithGoogleTTS(text, ttsLang);
+        resolve();
       }
-
-      utterance.lang = targetLang;
-      utterance.rate = 0.85;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-
-      utterance.onstart = () => setState('speaking');
-      utterance.onend = () => { setState('idle'); resolve(); };
-      utterance.onerror = () => { setState('idle'); resolve(); };
-
-      window.speechSynthesis.speak(utterance);
     });
-  }, [lang]);
+  }, [speakWithGoogleTTS]);
 
-  // Main speak function - uses Google TTS for Malayalam, browser for others
+  // Main speak function - uses Sarvam AI for Malayalam (best quality), Google TTS as fallback, browser for other languages
   const speak = useCallback(async (text: string, textLang?: string): Promise<void> => {
     const targetLang = textLang || lang;
     
-    // Use Google TTS for Malayalam (Chrome doesn't have Malayalam voice)
+    // Use Sarvam AI TTS for Malayalam (natural voice with Bulbul v2 model)
     if (targetLang.startsWith('ml') || targetLang === 'ml-IN') {
-      return speakWithGoogleTTS(text, 'ml');
+      return speakWithSarvamTTS(text, 'ml');
     }
     
     // Use browser TTS for other languages
     return speakWithBrowserTTS(text, targetLang);
-  }, [lang, speakWithGoogleTTS, speakWithBrowserTTS]);
+  }, [lang, speakWithSarvamTTS, speakWithBrowserTTS]);
 
   const cancelSpeech = useCallback(() => {
     if (isSpeechSynthesisSupported()) {
