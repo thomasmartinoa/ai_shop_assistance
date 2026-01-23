@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         inputs: [text],
         target_language_code: lang === 'ml' ? 'ml-IN' : lang,
-        speaker: 'meera', // Female Malayalam voice (meera/arvind for male)
+        speaker: 'karun', // Male Malayalam voice (karun/meera for female)
         pitch: 0,
         pace: 1.0,
         loudness: 1.5,
