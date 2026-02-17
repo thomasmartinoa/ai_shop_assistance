@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:glama.ai)",
+      "Bash(gcloud:*)",
+      "WebFetch(domain:www.heltar.com)",
+      "Bash(node scripts/setup-dialogflow.mjs:*)",
+      "Bash(GOOGLE_APPLICATION_CREDENTIALS=lock/shopkeeper-ai-34aa5428b332.json node -e \"\nconst { GoogleAuth } = require\\(''google-auth-library''\\);\nconst auth = new GoogleAuth\\({ scopes: [''https://www.googleapis.com/auth/dialogflow''] }\\);\nauth.getClient\\(\\).then\\(c => c.getAccessToken\\(\\)\\).then\\(t => console.log\\(''OK:'', t.token ? ''token received'' : ''no token''\\)\\).catch\\(e => console.error\\(''FAIL:'', e.message\\)\\);\n\")"
+    ]
+  }
+}

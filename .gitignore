@@ -32,6 +32,11 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Service account keys / secrets
+lock/
+*.json.key
+*-credentials.json
+
 # Vercel
 .vercel
 
