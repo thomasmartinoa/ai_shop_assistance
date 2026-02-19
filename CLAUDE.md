@@ -368,15 +368,6 @@ NEXT_PUBLIC_ENABLE_GST=true
 3. **Minimal text**: Icons + voice over reading
 4. **Clear feedback**: Visual + audio confirmation for all actions
 
-### Color Scheme
-```css
---primary: #2563eb;     /* Blue - main actions */
---success: #16a34a;     /* Green - confirmations */
---warning: #ea580c;     /* Orange - alerts */
---danger: #dc2626;      /* Red - errors/delete */
---background: #f8fafc;  /* Light gray */
---foreground: #0f172a;  /* Dark text */
-```
 
 ### Voice Feedback Patterns
 - **Listening**: "ഞാൻ കേൾക്കുന്നു" (I'm listening)
