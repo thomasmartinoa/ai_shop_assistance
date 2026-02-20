@@ -440,12 +440,6 @@ DIALOGFLOW_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY--
 - [x] Dev test phone OTP (no Twilio needed)
 - [x] Build verification: `next build` exit code 0
 
-### Phase 6: Deploy & Go Live
-- [ ] Cloudflare Pages deployment
-- [ ] Add Edge Function secrets (Sarvam, Dialogflow) in Supabase dashboard
-- [ ] Keep-alive cron job (prevent Supabase pausing)
-- [ ] Production testing
-- [ ] PWA icons (proper PNGs)
 
 ---
 
