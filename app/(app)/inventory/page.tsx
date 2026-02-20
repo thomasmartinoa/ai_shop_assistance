@@ -47,12 +47,12 @@ export default function InventoryPage() {
       if (!isFinal) return;
 
       const result = await processText(transcript);
-      
+
       switch (result.intent) {
         case 'inventory.add':
           const productName = result.entities.product;
           const quantity = result.entities.quantity || 10;
-          
+
           if (productName) {
             const existingProduct = findProduct(productName);
             if (existingProduct) {
@@ -356,30 +356,57 @@ export default function InventoryPage() {
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Product Name (English)</label>
-                <Input placeholder="Rice" />
+                <Input
+                  placeholder="Rice"
+                  value={newProduct.name_en}
+                  onChange={(e) => setNewProduct((p) => ({ ...p, name_en: e.target.value }))}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium">Product Name (Malayalam)</label>
-                <Input placeholder="അരി" />
+                <Input
+                  placeholder="അരി"
+                  value={newProduct.name_ml}
+                  onChange={(e) => setNewProduct((p) => ({ ...p, name_ml: e.target.value }))}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Price (₹)</label>
-                  <Input type="number" placeholder="50" />
+                  <Input
+                    type="number"
+                    placeholder="50"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct((p) => ({ ...p, price: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Unit</label>
-                  <Input placeholder="kg" />
+                  <Input
+                    placeholder="kg"
+                    value={newProduct.unit}
+                    onChange={(e) => setNewProduct((p) => ({ ...p, unit: e.target.value }))}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Current Stock</label>
-                  <Input type="number" placeholder="100" />
+                  <Input
+                    type="number"
+                    placeholder="100"
+                    value={newProduct.stock}
+                    onChange={(e) => setNewProduct((p) => ({ ...p, stock: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Min Stock Alert</label>
-                  <Input type="number" placeholder="10" />
+                  <Input
+                    type="number"
+                    placeholder="10"
+                    value={newProduct.min_stock}
+                    onChange={(e) => setNewProduct((p) => ({ ...p, min_stock: e.target.value }))}
+                  />
                 </div>
               </div>
               <div className="flex gap-2 pt-4">
@@ -390,7 +417,7 @@ export default function InventoryPage() {
                 >
                   Cancel
                 </Button>
-                <Button className="flex-1">Save Product</Button>
+                <Button className="flex-1" onClick={handleAddProduct}>Save Product</Button>
               </div>
             </CardContent>
           </Card>

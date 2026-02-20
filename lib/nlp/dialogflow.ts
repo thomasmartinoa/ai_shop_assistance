@@ -1,5 +1,6 @@
 'use client';
 
+import { callEdgeFunction, isEdgeFunctionsAvailable } from '@/lib/supabase/edge-functions';
 
 // Intent types that Dialogflow will detect
 export type DialogflowIntentType =
@@ -49,7 +50,7 @@ interface DialogflowConfig {
 // Get config from environment
 function getConfig(): DialogflowConfig | null {
   const projectId = process.env.NEXT_PUBLIC_DIALOGFLOW_PROJECT_ID;
-  
+
   if (!projectId) {
     console.warn('Dialogflow not configured. Set NEXT_PUBLIC_DIALOGFLOW_PROJECT_ID');
     return null;
@@ -63,36 +64,32 @@ function getConfig(): DialogflowConfig | null {
 }
 
 /**
- * Detect intent using Dialogflow REST API
- * Note: For production, use server-side API to protect credentials
+ * Detect intent using Dialogflow via Supabase Edge Function
  */
 export async function detectIntent(text: string): Promise<DialogflowResponse | null> {
   const config = getConfig();
-  
+
   if (!config) {
     return null;
   }
 
+  if (!isEdgeFunctionsAvailable()) {
+    console.warn('Edge functions not available for Dialogflow');
+    return null;
+  }
+
   try {
-    // Call our API route which handles Dialogflow authentication
-    const response = await fetch('/api/dialogflow/detect', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text,
-        sessionId: config.sessionId,
-        languageCode: config.languageCode,
-      }),
+    const { data, error } = await callEdgeFunction('dialogflow-detect', {
+      text,
+      sessionId: config.sessionId,
+      languageCode: config.languageCode,
     });
 
-    if (!response.ok) {
-      throw new Error(`Dialogflow API error: ${response.status}`);
+    if (error || !data) {
+      console.error('Dialogflow Edge Function error:', error);
+      return null;
     }
 
-    const data = await response.json();
-    
     // Debug logging - see what Dialogflow returns
     console.log('[Dialogflow Response]', {
       queryText: data.queryResult?.queryText,
@@ -101,7 +98,7 @@ export async function detectIntent(text: string): Promise<DialogflowResponse | n
       parameters: data.queryResult?.parameters,
       fulfillmentText: data.queryResult?.fulfillmentText,
     });
-    
+
     return parseDialogflowResponse(data, text);
   } catch (error) {
     console.error('Dialogflow detection failed:', error);
@@ -155,27 +152,27 @@ function mapIntentName(displayName: string): DialogflowIntentType {
     'billing.total': 'billing.total',
     'get_total': 'billing.total',
     'billing.complete': 'billing.complete',
-    
+
     // Inventory intents
     'inventory.add': 'inventory.add',
     'add_stock': 'inventory.add',
     'inventory.check': 'inventory.check',
     'check_stock': 'inventory.check',
     'inventory.update': 'inventory.update',
-    
+
     // Payment intents
     'payment.upi': 'payment.upi',
     'show_qr': 'payment.upi',
     'payment.cash': 'payment.cash',
-    
+
     // Report intents
     'report.today': 'report.today',
     'report.week': 'report.week',
-    
+
     // Navigation
     'navigation.billing': 'navigation.billing',
     'navigation.inventory': 'navigation.inventory',
-    
+
     // General
     'general.help': 'general.help',
     'general.greeting': 'general.greeting',

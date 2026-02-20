@@ -35,7 +35,7 @@ A voice-first assistant that enables Kerala shopkeepers to:
 │                                                                  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
 │  │ Web Speech   │  │  Pattern     │  │   QR Code    │          │
-│  │    API       │  │  NLP         │  │   (jsPDF)    │          │
+│  │    API       │  │  NLP         │  │   (qrcode)   │          │
 │  └──────────────┘  └──────────────┘  └──────────────┘          │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -48,12 +48,24 @@ A voice-first assistant that enables Kerala shopkeepers to:
 │  │   (500MB)    │  │ (Phone OTP)  │  │    (1GB)     │          │
 │  └──────────────┘  └──────────────┘  └──────────────┘          │
 │                                                                  │
-│  ┌──────────────┐  ┌──────────────┐                             │
-│  │   Realtime   │  │    Edge      │                             │
-│  │  (Live Sync) │  │  Functions   │                             │
-│  └──────────────┘  └──────────────┘                             │
+│  ┌──────────────────────────────────────────────────┐           │
+│  │              Edge Functions (Deno)                │           │
+│  │  ┌────────────┐ ┌────────────┐ ┌──────────────┐  │          │
+│  │  │ sarvam-tts │ │ google-tts │ │  dialogflow  │  │          │
+│  │  │ (Malayalam │ │ (fallback) │ │   -detect    │  │          │
+│  │  │   voice)  │ │            │ │  (NLP)       │  │          │
+│  │  └────────────┘ └────────────┘ └──────────────┘  │          │
+│  └──────────────────────────────────────────────────┘           │
 └─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+        Sarvam AI      Google Translate  Dialogflow ES
+        (TTS API)      (TTS fallback)   (NLP Intent)
 ```
+
+> **Note**: No API routes in Next.js. All server-side logic runs in Supabase Edge Functions.
+> See `docs/EDGE_FUNCTIONS.md` for technical spec.
 
 ### Why These Choices?
 
@@ -383,37 +395,56 @@ NEXT_PUBLIC_ENABLE_GST=true
 - [x] Project documentation (CLAUDE.md)
 - [x] Next.js project setup
 - [x] Tailwind + shadcn/ui
-- [x] Supabase client configuration
-- [x] Database schema
-- [x] Phone OTP authentication
-- [x] Base UI layout
+- [x] Supabase client configuration (demo mode fallback)
+- [x] Database schema (migration file created)
+- [x] Phone OTP authentication (demo mode works)
+- [x] Base UI layout (sidebar + header)
 
 ### Phase 2: Voice Integration ✅ COMPLETE
-- [x] Web Speech API wrapper
-- [x] Malayalam recognition setup
-- [x] Text-to-speech implementation
-- [x] Voice button component
+- [x] Web Speech API wrapper (continuous listening)
+- [x] Malayalam recognition setup (`ml-IN` locale)
+- [x] Text-to-speech (Sarvam AI + Google + Browser fallback chain)
+- [x] Voice button component (tap-to-toggle)
 - [x] Audio visualizer
 
-### Phase 3: Core Features ✅ COMPLETE
-- [x] Inventory management CRUD
-- [x] Voice-activated billing
-- [x] Cart state management
+### Phase 3: Core Features ⚠️ PARTIAL (Demo Only)
+- [x] Inventory management page (display + voice)
+- [x] Voice-activated billing with conversational flow
+- [x] Cart state management (in-memory only)
 - [x] GST calculations
+- [x] Smart NLP (Dialogflow + local pattern matching)
+- [ ] **BUG**: Inventory add product form inputs not connected to state
+- [ ] **BUG**: Transactions never saved to database
+- [ ] **BUG**: Stock never decremented after sale
+- [ ] **BUG**: Settings page save is a mock (no Supabase write)
 
-### Phase 4: Payments & Reports ⏳ PARTIAL
-- [x] UPI QR code display (placeholder)
-- [x] Payment confirmation flow
-- [x] Daily/weekly/monthly reports (mock data)
-- [ ] Actual QR code generation with UPI link
+### Phase 4: Payments & Reports ⚠️ PARTIAL
+- [x] UPI QR code generation (real, client-side)
+- [x] Payment confirmation flow (voice-driven)
+- [x] Reports page layout (mock data only)
+- [ ] Reports with real Supabase transaction data
 - [ ] Sales analytics charts
 
-### Phase 5: Polish & Deploy
-- [ ] Error handling
-- [ ] Loading states
+### Phase 5: Production Ready 🔴 NOT STARTED
+> **See**: `docs/IMPLEMENTATION_PLAN.md` for detailed plan
+- [ ] Supabase project setup (Mumbai region)
+- [ ] Migrate API routes to Supabase Edge Functions
+- [ ] Fix broken UI components (inventory form, settings save)
+- [ ] Transaction persistence after billing
+- [ ] Stock management on sale
+- [ ] Real reports from transaction data
+- [ ] Error handling + toast notifications
+- [ ] PWA icons (proper PNGs)
+- [ ] Build verification (`next build`)
+
+### Phase 6: Deploy & Go Live
 - [ ] Cloudflare Pages deployment
-- [ ] Keep-alive cron job
-- [ ] Testing & bug fixes
+- [ ] Keep-alive cron job (prevent Supabase pausing)
+- [ ] Production testing
+
+### Critical Architecture Issue (Resolved in Plan)
+**Problem**: 3 API routes exist (`/api/tts`, `/api/sarvam-tts`, `/api/dialogflow/detect`) but `next.config.js` uses `output: 'export'` (static). API routes are **ignored** in static export.
+**Solution**: Migrate to Supabase Edge Functions. See `docs/EDGE_FUNCTIONS.md`.
 
 ### Future: Wake Word
 - [ ] Research Web Speech API continuous listening
@@ -483,10 +514,18 @@ const { data, error } = await supabase
 
 | Issue | Status | Workaround |
 |-------|--------|------------|
+| API routes + static export conflict | **Critical** | Migrate to Supabase Edge Functions (see `docs/EDGE_FUNCTIONS.md`) |
+| Inventory add form disconnected | **Bug** | Wire input `value`/`onChange` to `newProduct` state |
+| Transactions never persisted | **Bug** | Create `useTransactions` hook, save after payment |
+| Settings save is mock | **Bug** | Replace `setTimeout` with real Supabase write |
+| Stock never decremented on sale | **Bug** | Call `updateStock()` after transaction save |
+| Reports use mock data | **Missing** | Query `transactions` table instead of `MOCK_STATS` |
 | Supabase pauses after 7 days | Needs cron | Set up Cloudflare Workers to ping every 6 days |
 | Web Speech API needs HTTPS | Expected | Cloudflare Pages provides HTTPS automatically |
-| Malayalam accuracy varies | Expected | Implement confirmation flow + fuzzy matching |
+| Malayalam accuracy varies | Expected | Confirmation flow + fuzzy matching implemented |
 | No offline support | By design | User requested online-only for simplicity |
+| No toast notifications | **Missing** | Using `alert()` - needs shadcn toast component |
+| PWA icons are placeholder | **Missing** | Only `icon.svg` exists, need PNG icons |
 
 ---
 
@@ -500,7 +539,29 @@ const { data, error } = await supabase
 
 ---
 
+## 📄 Planning Documents
+
+| Document | Purpose |
+|----------|---------|
+| `docs/plans/2026-02-19-production-ready-design.md` | Design doc: gap analysis, architecture decisions, component-level changes |
+| `docs/IMPLEMENTATION_PLAN.md` | Step-by-step execution plan with phases and acceptance criteria |
+| `docs/EDGE_FUNCTIONS.md` | Technical spec for Supabase Edge Functions migration |
+| `docs/DIALOGFLOW_SETUP.md` | Dialogflow ES setup guide (existing) |
+| `docs/SARVAM_VOICE_INTEGRATION.md` | Sarvam AI TTS integration guide (existing) |
+
+---
+
 ## 📅 Changelog
+
+### 2026-02-19 (Session 4) - Production Planning
+- Comprehensive codebase analysis and gap assessment
+- Created production-ready design document
+- Created implementation plan (5 phases)
+- Created Edge Functions technical spec
+- Updated CLAUDE.md with actual project status
+- Identified 6 critical bugs and 3 missing features
+- Decision: Migrate API routes to Supabase Edge Functions
+- Decision: Priority is making existing features work end-to-end
 
 ### 2025-12-05 (Session 3) - Smart NLP & Dialogflow Integration
 - Created `/lib/nlp/useSmartNLP.ts` - unified NLP hook combining Dialogflow with local fallback
@@ -553,5 +614,5 @@ const { data, error } = await supabase
 
 ---
 
-*Last Updated: December 5, 2025*
+*Last Updated: February 19, 2026*
 

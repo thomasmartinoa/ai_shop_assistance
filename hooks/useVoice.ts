@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { isSpeechRecognitionSupported, isSpeechSynthesisSupported } from '@/lib/utils';
 import { VOICE_SETTINGS } from '@/lib/constants';
+import { callEdgeFunction, isEdgeFunctionsAvailable } from '@/lib/supabase/edge-functions';
 
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
@@ -76,7 +77,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
   const isListeningRef = useRef(false);
   const onResultRef = useRef(onResult);
   const onErrorRef = useRef(onError);
-  
+
   const isSupported = isSpeechRecognitionSupported();
 
   // Keep refs updated
@@ -101,7 +102,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
           const loadedVoices = window.speechSynthesis.getVoices();
           console.log('🔊 Voices loaded:', loadedVoices.length);
           // Log available Indian voices
-          const indianVoices = loadedVoices.filter(v => 
+          const indianVoices = loadedVoices.filter(v =>
             v.lang.startsWith('ml') || v.lang.startsWith('hi') || v.lang === 'en-IN'
           );
           console.log('🔊 Indian voices:', indianVoices.map(v => `${v.name} (${v.lang})`));
@@ -121,7 +122,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    
+
     // Configure
     recognition.continuous = continuous;
     recognition.interimResults = true;
@@ -149,7 +150,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       console.log('🎤 Got result!', event.results.length, 'results');
-      
+
       let finalTranscript = '';
       let interim = '';
 
@@ -157,7 +158,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
         const result = event.results[i];
         const text = result[0].transcript;
         console.log(`🎤 Result ${i}: "${text}" (final: ${result.isFinal}, confidence: ${result[0].confidence})`);
-        
+
         if (result.isFinal) {
           finalTranscript += text;
         } else {
@@ -180,7 +181,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('🎤 Error:', event.error);
-      
+
       // For no-speech, just restart if we're supposed to be listening
       if (event.error === 'no-speech') {
         console.log('🎤 No speech detected, restarting...');
@@ -195,12 +196,12 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
         }
         return;
       }
-      
+
       // For aborted, just ignore
       if (event.error === 'aborted') {
         return;
       }
-      
+
       // For real errors, show error state
       isListeningRef.current = false;
       setState('error');
@@ -210,7 +211,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
 
     recognition.onend = () => {
       console.log('🎤 Recognition ended, state:', stateRef.current);
-      
+
       // Always restart if we're supposed to be listening
       if (stateRef.current === 'listening') {
         console.log('🎤 Restarting to keep listening...');
@@ -243,12 +244,12 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
       console.log('🎤 No recognition object');
       return;
     }
-    
+
     if (isListeningRef.current) {
       console.log('🎤 Already listening');
       return;
     }
-    
+
     try {
       console.log('🎤 Starting recognition...');
       setTranscript('');
@@ -271,16 +272,16 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
   const stopListening = useCallback(() => {
     const recognition = recognitionRef.current;
     if (!recognition) return;
-    
+
     console.log('🎤 Stopping recognition...');
     isListeningRef.current = false;
-    
+
     try {
       recognition.stop();
     } catch (error) {
       console.error('🎤 Failed to stop:', error);
     }
-    
+
     setState('idle');
   }, []);
 
@@ -308,12 +309,12 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = window.speechSynthesis.getVoices();
       const targetLang = textLang || lang;
-      
+
       // Try to find best available voice
       let selectedVoice = voices.find(v => v.lang.startsWith('ml')) ||
-                          voices.find(v => v.lang.startsWith('hi')) ||
-                          voices.find(v => v.lang === 'en-IN') ||
-                          voices.find(v => v.lang.startsWith('en'));
+        voices.find(v => v.lang.startsWith('hi')) ||
+        voices.find(v => v.lang === 'en-IN') ||
+        voices.find(v => v.lang.startsWith('en'));
 
       if (selectedVoice) {
         utterance.voice = selectedVoice;
@@ -333,34 +334,26 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
     });
   }, [lang]);
 
-  // Fallback: Use server-side Google TTS API for Malayalam
+  // Fallback: Use Supabase Edge Function for Google TTS
   const speakWithGoogleTTS = useCallback(async (text: string, ttsLang: string = 'ml'): Promise<void> => {
     console.log('🔊 Speaking with Google TTS (fallback):', text, 'lang:', ttsLang);
-    
+
     return new Promise(async (resolve) => {
       try {
         setState('speaking');
-        
-        // Call our server-side TTS API
-        const response = await fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, lang: ttsLang }),
-        });
 
-        if (!response.ok) {
-          console.error('🔊 TTS API error:', response.status);
-          // Fallback to browser TTS
-          console.log('🔊 Falling back to browser TTS...');
+        if (!isEdgeFunctionsAvailable()) {
+          console.log('🔊 Edge functions not available, using browser TTS...');
           await speakWithBrowserTTS(text, ttsLang);
           resolve();
           return;
         }
 
-        const data = await response.json();
-        
-        if (!data.audioUrl) {
-          console.error('🔊 No audio URL in response');
+        const { data, error } = await callEdgeFunction('google-tts', { text, lang: ttsLang });
+
+        if (error || !data?.audioUrl) {
+          console.error('🔊 Google TTS Edge Function error:', error);
+          console.log('🔊 Falling back to browser TTS...');
           await speakWithBrowserTTS(text, ttsLang);
           resolve();
           return;
@@ -369,7 +362,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
         // Play the audio from data URL
         const audio = new Audio(data.audioUrl);
         audio.volume = 1.0;
-        
+
         audio.oncanplaythrough = () => {
           console.log('🔊 Audio ready, playing Malayalam...');
           audio.play().catch(err => {
@@ -378,26 +371,25 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
             resolve();
           });
         };
-        
+
         audio.onplay = () => {
           console.log('🔊 Google TTS speech started');
         };
-        
+
         audio.onended = () => {
           console.log('🔊 Google TTS speech ended');
           setState('idle');
           resolve();
         };
-        
+
         audio.onerror = (e) => {
           console.error('🔊 Audio playback error:', e);
-          // Fallback to browser TTS
           console.log('🔊 Falling back to browser TTS...');
           speakWithBrowserTTS(text, ttsLang).then(resolve);
         };
-        
+
       } catch (error) {
-        console.error('🔊 Google TTS API error:', error);
+        console.error('🔊 Google TTS error:', error);
         await speakWithBrowserTTS(text, ttsLang);
         resolve();
       }
@@ -407,24 +399,25 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
   // Use Sarvam AI TTS for Malayalam (best quality natural voice)
   const speakWithSarvamTTS = useCallback(async (text: string, ttsLang: string = 'ml'): Promise<void> => {
     console.log('🔊 Speaking with Sarvam AI TTS:', text, 'lang:', ttsLang);
-    
+
     return new Promise(async (resolve) => {
       try {
         setState('speaking');
-        
-        // Call Sarvam TTS API
-        const response = await fetch('/api/sarvam-tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, lang: ttsLang }),
-        });
 
-        if (!response.ok) {
-          const data = await response.json();
-          console.error('🔊 Sarvam TTS API error:', response.status, data);
-          
+        if (!isEdgeFunctionsAvailable()) {
+          console.log('🔊 Edge functions not available, using Google TTS...');
+          await speakWithGoogleTTS(text, ttsLang);
+          resolve();
+          return;
+        }
+
+        const { data, error } = await callEdgeFunction('sarvam-tts', { text, lang: ttsLang });
+
+        if (error || !data?.audioUrl) {
+          console.error('🔊 Sarvam TTS Edge Function error:', error);
+
           // Check if we should fallback
-          if (data.fallback) {
+          if (data?.fallback || error) {
             console.log('🔊 Falling back to Google TTS...');
             await speakWithGoogleTTS(text, ttsLang);
             resolve();
@@ -432,9 +425,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
           }
         }
 
-        const data = await response.json();
-        
-        if (!data.audioUrl) {
+        if (!data?.audioUrl) {
           console.error('🔊 No audio URL in Sarvam response');
           await speakWithGoogleTTS(text, ttsLang);
           resolve();
@@ -446,7 +437,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
         // Play the audio from data URL
         const audio = new Audio(data.audioUrl);
         audio.volume = 1.0;
-        
+
         audio.oncanplaythrough = () => {
           console.log('🔊 Sarvam audio ready, playing...');
           audio.play().catch(err => {
@@ -455,23 +446,23 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
             resolve();
           });
         };
-        
+
         audio.onplay = () => {
           console.log('🔊 Sarvam Malayalam speech started');
         };
-        
+
         audio.onended = () => {
           console.log('🔊 Sarvam Malayalam speech ended');
           setState('idle');
           resolve();
         };
-        
+
         audio.onerror = (e) => {
           console.error('🔊 Sarvam audio playback error:', e);
           console.log('🔊 Falling back to Google TTS...');
           speakWithGoogleTTS(text, ttsLang).then(resolve);
         };
-        
+
       } catch (error) {
         console.error('🔊 Sarvam TTS error:', error);
         await speakWithGoogleTTS(text, ttsLang);
@@ -483,12 +474,12 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
   // Main speak function - uses Sarvam AI for Malayalam (best quality), Google TTS as fallback, browser for other languages
   const speak = useCallback(async (text: string, textLang?: string): Promise<void> => {
     const targetLang = textLang || lang;
-    
+
     // Use Sarvam AI TTS for Malayalam (natural voice with Bulbul v2 model)
     if (targetLang.startsWith('ml') || targetLang === 'ml-IN') {
       return speakWithSarvamTTS(text, 'ml');
     }
-    
+
     // Use browser TTS for other languages
     return speakWithBrowserTTS(text, targetLang);
   }, [lang, speakWithSarvamTTS, speakWithBrowserTTS]);

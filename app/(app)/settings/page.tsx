@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/shared/Toast';
+import { getSupabaseClient } from '@/lib/supabase/client';
 import {
   Store,
   Phone,
@@ -17,7 +19,8 @@ import {
 } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { shop, refreshShop } = useAuth();
+  const { shop, refreshShop, isDemoMode } = useAuth();
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: shop?.name || '',
@@ -38,13 +41,38 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      // TODO: Save to Supabase
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Mock delay
+      if (isDemoMode || !shop) {
+        // In demo mode, just show success
+        await refreshShop();
+        showToast('Settings saved (demo mode)', 'success');
+        return;
+      }
+
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        showToast('Supabase not configured', 'error');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('shops')
+        .update({
+          name: formData.name,
+          name_ml: formData.nameMl || null,
+          phone: formData.phone || null,
+          address: formData.address || null,
+          upi_id: formData.upiId || null,
+          gstin: formData.gstin || null,
+        })
+        .eq('id', shop.id);
+
+      if (error) throw error;
+
       await refreshShop();
-      alert('Settings saved!');
+      showToast('Settings saved successfully!', 'success');
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+      showToast('Failed to save settings. Please try again.', 'error');
     } finally {
       setIsLoading(false);
     }
