@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTransactions, type Period } from '@/hooks/useTransactions';
 import {
   TrendingUp,
   TrendingDown,
@@ -11,31 +13,17 @@ import {
   ShoppingCart,
   Calendar,
   Download,
+  Loader2,
+  AlertCircle,
+  PackageOpen,
 } from 'lucide-react';
 
-// Mock data
-const MOCK_STATS = {
-  today: { sales: 4520, orders: 23, avgOrder: 196 },
-  week: { sales: 28450, orders: 142, avgOrder: 200 },
-  month: { sales: 124800, orders: 623, avgOrder: 200 },
-};
-
-const MOCK_TOP_PRODUCTS = [
-  { name: 'Rice (അരി)', qty: 120, revenue: 6000 },
-  { name: 'Sugar (പഞ്ചസാര)', qty: 85, revenue: 3825 },
-  { name: 'Coconut Oil (വെളിച്ചെണ്ണ)', qty: 45, revenue: 6750 },
-  { name: 'Tea Powder (ചായപ്പൊടി)', qty: 38, revenue: 6840 },
-  { name: 'Soap (സോപ്പ്)', qty: 72, revenue: 2520 },
-];
-
-type Period = 'today' | 'week' | 'month';
-
 export default function ReportsPage() {
+  const { shop, isDemoMode } = useAuth();
   const [period, setPeriod] = useState<Period>('today');
-  const stats = MOCK_STATS[period];
+  const { stats, topProducts, isLoading, error } = useTransactions(shop?.id, period);
 
-  // Calculate growth (mock)
-  const growth = period === 'today' ? 12 : period === 'week' ? 8 : 15;
+  const periodLabel = period === 'today' ? 'today' : period === 'week' ? 'this week' : 'this month';
 
   return (
     <div className="space-y-6">
@@ -47,11 +35,27 @@ export default function ReportsPage() {
             Sales analytics and performance metrics
           </p>
         </div>
-        <Button variant="outline">
+        <Button variant="outline" disabled>
           <Download className="w-4 h-4 mr-2" />
           Export
         </Button>
       </div>
+
+      {/* Demo mode banner */}
+      {isDemoMode && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300 text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          Demo mode — connect Supabase to see real sales data.
+        </div>
+      )}
+
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
       {/* Period selector */}
       <div className="flex gap-2">
@@ -77,21 +81,14 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatCurrency(stats.sales)}</p>
-            <div className="flex items-center gap-1 mt-1">
-              {growth >= 0 ? (
-                <TrendingUp className="w-4 h-4 text-green-500" />
-              ) : (
-                <TrendingDown className="w-4 h-4 text-red-500" />
-              )}
-              <span
-                className={`text-sm ${
-                  growth >= 0 ? 'text-green-500' : 'text-red-500'
-                }`}
-              >
-                {growth}% vs last {period}
-              </span>
-            </div>
+            {isLoading ? (
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            ) : (
+              <>
+                <p className="text-3xl font-bold">{formatCurrency(stats.sales)}</p>
+                <p className="text-sm text-muted-foreground mt-1">{periodLabel}</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -103,10 +100,14 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{stats.orders}</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              transactions completed
-            </p>
+            {isLoading ? (
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            ) : (
+              <>
+                <p className="text-3xl font-bold">{stats.orders}</p>
+                <p className="text-sm text-muted-foreground mt-1">transactions completed</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -118,8 +119,14 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatCurrency(stats.avgOrder)}</p>
-            <p className="text-sm text-muted-foreground mt-1">per transaction</p>
+            {isLoading ? (
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            ) : (
+              <>
+                <p className="text-3xl font-bold">{formatCurrency(stats.avgOrder)}</p>
+                <p className="text-sm text-muted-foreground mt-1">per transaction</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -130,27 +137,39 @@ export default function ReportsPage() {
           <CardTitle>Top Selling Products</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {MOCK_TOP_PRODUCTS.map((product, index) => (
-              <div
-                key={product.name}
-                className="flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-xs font-medium">
-                    {index + 1}
-                  </span>
-                  <span className="font-medium">{product.name}</span>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : topProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+              <PackageOpen className="w-10 h-10 mb-3 opacity-40" />
+              <p className="text-sm">No sales recorded {periodLabel}.</p>
+              <p className="text-xs mt-1">Complete some bills to see data here.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {topProducts.map((product, index) => (
+                <div
+                  key={product.name}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-xs font-medium">
+                      {index + 1}
+                    </span>
+                    <span className="font-medium">{product.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{formatCurrency(product.revenue)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {product.qty} sold
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold">{formatCurrency(product.revenue)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {product.qty} sold
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -160,8 +179,8 @@ export default function ReportsPage() {
           <CardTitle>Sales Trend</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-64 bg-muted/50 rounded-lg flex items-center justify-center">
-            <p className="text-muted-foreground">
+          <div className="h-48 bg-muted/50 rounded-lg flex items-center justify-center">
+            <p className="text-muted-foreground text-sm">
               Chart visualization coming soon
             </p>
           </div>

@@ -14,7 +14,7 @@ type Step = 'phone' | 'otp';
 export default function LoginPage() {
   const router = useRouter();
   const { signInWithOtp, verifyOtp, enableDemoMode } = useAuth();
-  
+
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -72,7 +72,7 @@ export default function LoginPage() {
 
       const cleanPhone = phone.replace(/\D/g, '');
       const { error } = await verifyOtp(cleanPhone, otp);
-      
+
       if (error) {
         setError(error.message);
       } else {
@@ -95,13 +95,13 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl">Welcome Back</CardTitle>
           <CardDescription>
-            {step === 'phone' 
-              ? 'Enter your phone number to login'
-              : `Enter the OTP sent to +91 ${phone}`
+            {step === 'phone'
+              ? 'Enter your phone number to get started'
+              : `We'll verify your number +91 ${phone}`
             }
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent>
           {step === 'phone' ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
@@ -128,9 +128,9 @@ export default function LoginPage() {
                 <p className="text-sm text-destructive">{error}</p>
               )}
 
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 size="lg"
                 disabled={isLoading || phone.length < 10}
               >
@@ -144,13 +144,16 @@ export default function LoginPage() {
             </form>
           ) : (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
-              {/* Demo OTP hint */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                <p className="text-sm text-blue-700 font-medium">📱 Demo Mode</p>
-                <p className="text-xs text-blue-600 mt-1">
-                  Enter OTP: <span className="font-mono font-bold text-lg">123456</span>
-                </p>
-              </div>
+              {/* Test OTP hint — only shown in development */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">🧪 Dev / Test Mode</p>
+                  <p className="text-xs text-amber-600 mt-1">
+                    Use your Supabase test phone number.<br />
+                    Enter OTP: <span className="font-mono font-bold text-lg">123456</span>
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="otp">Enter OTP</Label>
@@ -170,9 +173,9 @@ export default function LoginPage() {
                 <p className="text-sm text-destructive">{error}</p>
               )}
 
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 size="lg"
                 disabled={isLoading || otp.length < 6}
               >
@@ -203,7 +206,7 @@ export default function LoginPage() {
           {/* Demo mode button */}
           <div className="mt-6 pt-6 border-t">
             <p className="text-xs text-center text-muted-foreground mb-3">
-              No Supabase configured? Try the app in demo mode:
+              Want to explore without logging in?
             </p>
             <Button
               type="button"
