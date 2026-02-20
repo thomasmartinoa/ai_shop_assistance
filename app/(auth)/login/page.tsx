@@ -149,8 +149,8 @@ export default function LoginPage() {
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
                   <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">🧪 Dev / Test Mode</p>
                   <p className="text-xs text-amber-600 mt-1">
-                    Use your Supabase test phone number.<br />
-                    Enter OTP: <span className="font-mono font-bold text-lg">123456</span>
+                    Test number: <span className="font-mono font-bold">9443129400</span><br />
+                    OTP: <span className="font-mono font-bold text-lg">121212</span>
                   </p>
                 </div>
               )}

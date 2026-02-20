@@ -41,8 +41,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      if (isDemoMode || !shop) {
-        // In demo mode, just show success
+      if (isDemoMode) {
         await refreshShop();
         showToast('Settings saved (demo mode)', 'success');
         return;
@@ -54,22 +53,51 @@ export default function SettingsPage() {
         return;
       }
 
-      const { error } = await supabase
-        .from('shops')
-        .update({
-          name: formData.name,
-          name_ml: formData.nameMl || null,
-          phone: formData.phone || null,
-          address: formData.address || null,
-          upi_id: formData.upiId || null,
-          gstin: formData.gstin || null,
-        })
-        .eq('id', shop.id);
+      if (shop) {
+        // Existing shop — UPDATE
+        const { error } = await supabase
+          .from('shops')
+          .update({
+            name: formData.name,
+            name_ml: formData.nameMl || null,
+            phone: formData.phone || null,
+            address: formData.address || null,
+            upi_id: formData.upiId || null,
+            gstin: formData.gstin || null,
+          })
+          .eq('id', shop.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // New user — INSERT a new shop
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          showToast('Please log in first', 'error');
+          return;
+        }
+
+        if (!formData.name.trim()) {
+          showToast('Shop name is required', 'error');
+          return;
+        }
+
+        const { error } = await supabase
+          .from('shops')
+          .insert({
+            owner_id: user.id,
+            name: formData.name,
+            name_ml: formData.nameMl || null,
+            phone: formData.phone || null,
+            address: formData.address || null,
+            upi_id: formData.upiId || null,
+            gstin: formData.gstin || null,
+          });
+
+        if (error) throw error;
+      }
 
       await refreshShop();
-      showToast('Settings saved successfully!', 'success');
+      showToast(shop ? 'Settings saved successfully!' : 'Shop created! 🎉', 'success');
     } catch (error) {
       console.error('Error saving settings:', error);
       showToast('Failed to save settings. Please try again.', 'error');
@@ -87,6 +115,21 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      {/* New user setup prompt */}
+      {!shop && !isDemoMode && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="flex items-start gap-3 p-4">
+            <Store className="w-6 h-6 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold text-amber-900">Welcome! Let's set up your shop</p>
+              <p className="text-sm text-amber-700 mt-1">
+                Fill in your shop name below and hit Save to create your shop. You can add more details later.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Shop Information */}
       <Card>
         <CardHeader>
@@ -95,7 +138,7 @@ export default function SettingsPage() {
             Shop Information
           </CardTitle>
           <CardDescription>
-            Basic details about your shop
+            {shop ? 'Basic details about your shop' : 'Enter your shop details to get started'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

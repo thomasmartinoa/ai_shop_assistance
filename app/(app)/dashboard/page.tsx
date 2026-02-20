@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useTransactions } from '@/hooks/useTransactions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -12,19 +13,13 @@ import {
   IndianRupee,
   ShoppingCart,
   ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 export default function DashboardPage() {
   const { shop } = useAuth();
-
-  // TODO: Fetch actual data from Supabase
-  const stats = {
-    todaySales: 4520,
-    totalOrders: 23,
-    lowStockItems: 5,
-    topProduct: 'Rice (അരി)',
-  };
+  const { stats, topProducts, isLoading } = useTransactions(shop?.id, 'today');
 
   return (
     <div className="space-y-6">
@@ -66,9 +61,13 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">
-              {formatCurrency(stats.todaySales)}
-            </p>
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            ) : (
+              <p className="text-2xl font-bold text-green-600">
+                {formatCurrency(stats.sales)}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -80,21 +79,29 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stats.totalOrders}</p>
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            ) : (
+              <p className="text-2xl font-bold">{stats.orders}</p>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              Low Stock
+              <IndianRupee className="w-4 h-4" />
+              Avg Order
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-orange-500">
-              {stats.lowStockItems}
-            </p>
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            ) : (
+              <p className="text-2xl font-bold">
+                {formatCurrency(stats.avgOrder)}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -106,7 +113,13 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-semibold truncate">{stats.topProduct}</p>
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            ) : (
+              <p className="text-lg font-semibold truncate">
+                {topProducts.length > 0 ? topProducts[0].name : '—'}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

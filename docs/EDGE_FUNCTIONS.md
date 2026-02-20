@@ -1,18 +1,19 @@
 # Supabase Edge Functions - Technical Spec
 
 **Purpose**: Replace Next.js API routes with Supabase Edge Functions for static export compatibility.
+**Status**: ✅ All 3 functions deployed to project `ctrjetjhwvgqoqpbytyb`
 
 ---
 
 ## Overview
 
-The app uses `output: 'export'` in `next.config.js` for Cloudflare Pages static deployment. This means **no server-side code** can run in Next.js. All 3 existing API routes must be migrated to Supabase Edge Functions.
+The app uses `output: 'export'` in `next.config.js` for static deployment. This means **no server-side code** can run in Next.js. All 3 API routes have been migrated to Supabase Edge Functions and the old routes deleted.
 
-### Current API Routes (To Be Removed)
+### API Routes (Removed ✅)
 ```
-app/api/sarvam-tts/route.ts      -> Supabase Edge Function: sarvam-tts
-app/api/tts/route.ts             -> Supabase Edge Function: google-tts
-app/api/dialogflow/detect/route.ts -> Supabase Edge Function: dialogflow-detect
+app/api/sarvam-tts/route.ts      -> Edge Function: sarvam-tts ✅
+app/api/tts/route.ts             -> Edge Function: google-tts ✅
+app/api/dialogflow/detect/route.ts -> Edge Function: dialogflow-detect ✅
 ```
 
 ---
@@ -24,7 +25,7 @@ Convert Malayalam text to speech using Sarvam AI's Bulbul v2 model.
 
 ### Endpoint
 ```
-POST https://<project-ref>.supabase.co/functions/v1/sarvam-tts
+POST https://ctrjetjhwvgqoqpbytyb.supabase.co/functions/v1/sarvam-tts
 ```
 
 ### Request
@@ -77,7 +78,7 @@ Fallback TTS using Google Translate's unofficial TTS endpoint.
 
 ### Endpoint
 ```
-POST https://<project-ref>.supabase.co/functions/v1/google-tts
+POST https://ctrjetjhwvgqoqpbytyb.supabase.co/functions/v1/google-tts
 ```
 
 ### Request
@@ -115,7 +116,7 @@ Detect user intent from Malayalam/English text using Dialogflow ES.
 
 ### Endpoint
 ```
-POST https://<project-ref>.supabase.co/functions/v1/dialogflow-detect
+POST https://ctrjetjhwvgqoqpbytyb.supabase.co/functions/v1/dialogflow-detect
 ```
 
 ### Request
@@ -263,7 +264,7 @@ curl -X POST http://localhost:54321/functions/v1/sarvam-tts \
 ### Production Testing
 ```bash
 # Test deployed function
-curl -X POST https://<project-ref>.supabase.co/functions/v1/sarvam-tts \
+curl -X POST https://ctrjetjhwvgqoqpbytyb.supabase.co/functions/v1/sarvam-tts \
   -H "Authorization: Bearer <user-jwt>" \
   -H "Content-Type: application/json" \
   -d '{"text": "നമസ്കാരം", "lang": "ml"}'

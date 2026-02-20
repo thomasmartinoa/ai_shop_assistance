@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch shop data for the current user
   const fetchShop = useCallback(async (userId: string) => {
     if (!supabase) return;
-    
+
     const { data, error } = await supabase
       .from('shops')
       .select('*')
@@ -149,20 +149,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Sign in with phone OTP
   const signInWithOtp = async (phone: string) => {
+    // DEV-ONLY: bypass Supabase/Twilio for test phone numbers
+    if (process.env.NODE_ENV === 'development') {
+      const testPhones = ['9443129400', '+919443129400', '9876543210', '+919876543210'];
+      const clean = phone.replace(/\D/g, '').slice(-10);
+      if (testPhones.some(t => t.replace(/\D/g, '').slice(-10) === clean)) {
+        sessionStorage.setItem('dev_test_phone', clean);
+        return { error: null };
+      }
+    }
+
     if (!isSupabaseConfigured || !supabase) {
-      // In demo mode, proceed to OTP step (don't auto-login yet)
-      // This allows user to see the OTP verification flow
       return { error: null, isDemo: true };
     }
 
     try {
-      // Format phone number for India
       const formattedPhone = phone.startsWith('+91') ? phone : `+91${phone}`;
-      
       const { error } = await supabase.auth.signInWithOtp({
         phone: formattedPhone,
       });
-
       return { error: error ? new Error(error.message) : null };
     } catch (error) {
       return { error: error as Error };
@@ -171,8 +176,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Verify OTP
   const verifyOtp = async (phone: string, token: string) => {
+    // DEV-ONLY: accept test OTP for test phone numbers
+    if (process.env.NODE_ENV === 'development') {
+      const storedPhone = sessionStorage.getItem('dev_test_phone');
+      const clean = phone.replace(/\D/g, '').slice(-10);
+      if (storedPhone === clean) {
+        if (token === '121212') {
+          sessionStorage.removeItem('dev_test_phone');
+          enableDemoMode();
+          return { error: null };
+        }
+        return { error: new Error('Wrong test OTP — use 121212') };
+      }
+    }
+
     if (!isSupabaseConfigured || !supabase) {
-      // In demo mode, accept demo OTP
       if (token === '123456') {
         enableDemoMode();
         return { error: null };
@@ -182,13 +200,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const formattedPhone = phone.startsWith('+91') ? phone : `+91${phone}`;
-      
       const { error } = await supabase.auth.verifyOtp({
         phone: formattedPhone,
         token,
         type: 'sms',
       });
-
       return { error: error ? new Error(error.message) : null };
     } catch (error) {
       return { error: error as Error };
