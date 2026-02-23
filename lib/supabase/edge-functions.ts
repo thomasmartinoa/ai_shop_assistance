@@ -11,36 +11,42 @@ export async function callEdgeFunction<T = any>(
 ): Promise<{ data: T | null; error: string | null }> {
     try {
         const supabase = getSupabaseClient();
-
-        // Build the Edge Function URL
+        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
         const url = `${SUPABASE_URL}/functions/v1/${functionName}`;
 
-        // Get auth token if available
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-        };
-
+        // Get auth token if available, fall back to anon key
+        let authToken = anonKey || '';
         if (supabase) {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.access_token) {
-                headers['Authorization'] = `Bearer ${session.access_token}`;
+                authToken = session.access_token;
             }
         }
 
-        // Fallback: use anon key if no session
-        if (!headers['Authorization']) {
-            const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-            if (anonKey) {
-                headers['Authorization'] = `Bearer ${anonKey}`;
-                headers['apikey'] = anonKey;
-            }
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+        };
+        if (anonKey) {
+            headers['apikey'] = anonKey;
         }
 
-        const response = await fetch(url, {
+        let response = await fetch(url, {
             method: 'POST',
             headers,
             body: JSON.stringify(body),
         });
+
+        // If session token expired (401), retry with anon key
+        if (response.status === 401 && anonKey && authToken !== anonKey) {
+            console.warn(`Edge function ${functionName}: 401 with session token, retrying with anon key`);
+            headers['Authorization'] = `Bearer ${anonKey}`;
+            response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body),
+            });
+        }
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: response.statusText }));

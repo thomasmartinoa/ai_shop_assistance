@@ -46,6 +46,10 @@ interface UseVoiceOptions {
   continuous?: boolean;
   onResult?: (transcript: string, isFinal: boolean) => void;
   onError?: (error: string) => void;
+  /** Called after ~1.5s of silence following speech — use to prompt "anything else?" */
+  onSilence?: () => void;
+  /** Silence threshold in ms (default: 1500) */
+  silenceThresholdMs?: number;
 }
 
 interface UseVoiceReturn {
@@ -66,6 +70,8 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
     continuous = VOICE_SETTINGS.continuous,
     onResult,
     onError,
+    onSilence,
+    silenceThresholdMs = 1500,
   } = options;
 
   const [state, setState] = useState<VoiceState>('idle');
@@ -77,6 +83,9 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
   const isListeningRef = useRef(false);
   const onResultRef = useRef(onResult);
   const onErrorRef = useRef(onError);
+  const onSilenceRef = useRef(onSilence);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const silenceThresholdRef = useRef(silenceThresholdMs);
 
   const isSupported = isSpeechRecognitionSupported();
 
@@ -84,7 +93,9 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
   useEffect(() => {
     onResultRef.current = onResult;
     onErrorRef.current = onError;
-  }, [onResult, onError]);
+    onSilenceRef.current = onSilence;
+    silenceThresholdRef.current = silenceThresholdMs;
+  }, [onResult, onError, onSilence, silenceThresholdMs]);
 
   // Keep state ref in sync
   useEffect(() => {
@@ -142,10 +153,24 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
 
     recognition.onspeechstart = () => {
       console.log('🎤 Speech detected!');
+      // Cancel any pending silence timer when speech resumes
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
     };
 
     recognition.onspeechend = () => {
       console.log('🎤 Speech ended');
+      // Start silence timer — fire onSilence if no new speech within threshold
+      if (onSilenceRef.current && isListeningRef.current) {
+        silenceTimerRef.current = setTimeout(() => {
+          if (isListeningRef.current && stateRef.current === 'listening') {
+            console.log('🎤 Silence detected, firing onSilence');
+            onSilenceRef.current?.();
+          }
+        }, silenceThresholdRef.current);
+      }
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -275,6 +300,12 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
 
     console.log('🎤 Stopping recognition...');
     isListeningRef.current = false;
+
+    // Clear any pending silence timer
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
 
     try {
       recognition.stop();

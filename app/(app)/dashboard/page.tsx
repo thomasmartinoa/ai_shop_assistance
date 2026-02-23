@@ -1,162 +1,100 @@
 'use client';
 
+import { DollarSign, ShoppingBag, Package, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProducts } from '@/hooks/useProducts';
 import { useTransactions } from '@/hooks/useTransactions';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import {
-  Mic,
-  Package,
-  TrendingUp,
-  AlertCircle,
-  IndianRupee,
-  ShoppingCart,
-  ArrowRight,
-  Loader2,
-} from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { StatCard } from '@/components/dashboard/StatCard';
+import { RevenueChart } from '@/components/dashboard/RevenueChart';
+import { LowStockAlert } from '@/components/dashboard/LowStockAlert';
+import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
+import { TopProducts } from '@/components/dashboard/TopProducts';
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-100 animate-pulse">
+      <div className="h-10 w-10 rounded-xl bg-gray-200" />
+      <div className="mt-3 h-7 w-24 rounded bg-gray-200" />
+      <div className="mt-2 h-4 w-16 rounded bg-gray-100" />
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { shop } = useAuth();
-  const { stats, topProducts, isLoading } = useTransactions(shop?.id, 'today');
+  const { products, getLowStockProducts, isLoading: productsLoading } = useProducts({ shopId: shop?.id });
+  const { stats, topProducts, transactions, isLoading: statsLoading } = useTransactions(shop?.id, 'today');
+
+  const lowStock = getLowStockProducts();
+  const isLoading = productsLoading || statsLoading;
 
   return (
-    <div className="space-y-6">
-      {/* Welcome message */}
+    <div className="min-h-screen bg-page p-4 sm:p-6 lg:p-8 space-y-6">
+      {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold">
-          Welcome back{shop?.name ? `, ${shop.name}` : ''}!
-        </h2>
-        <p className="text-muted-foreground">
-          Here's what's happening with your shop today.
+        <h1 className="text-2xl font-bold text-gray-900">
+          Welcome, {shop?.name || 'Your Shop'} 👋
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Here&apos;s what&apos;s happening in your store today
         </p>
       </div>
 
-      {/* Quick action - Voice Billing */}
-      <Link href="/billing">
-        <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-colors">
-          <CardContent className="flex items-center justify-between p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-                <Mic className="w-7 h-7" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold">Start Voice Billing</h3>
-                <p className="text-blue-100">Tap to start billing with voice</p>
-              </div>
-            </div>
-            <ArrowRight className="w-6 h-6" />
-          </CardContent>
-        </Card>
-      </Link>
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <IndianRupee className="w-4 h-4" />
-              Today's Sales
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            ) : (
-              <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(stats.sales)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4" />
-              Orders
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            ) : (
-              <p className="text-2xl font-bold">{stats.orders}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <IndianRupee className="w-4 h-4" />
-              Avg Order
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            ) : (
-              <p className="text-2xl font-bold">
-                {formatCurrency(stats.avgOrder)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Top Seller
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            ) : (
-              <p className="text-lg font-semibold truncate">
-                {topProducts.length > 0 ? topProducts[0].name : '—'}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick actions */}
-      <div className="grid grid-cols-2 gap-4">
-        <Link href="/inventory">
-          <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
-            <Package className="w-6 h-6" />
-            <span>Manage Inventory</span>
-          </Button>
-        </Link>
-        <Link href="/reports">
-          <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2">
-            <TrendingUp className="w-6 h-6" />
-            <span>View Reports</span>
-          </Button>
-        </Link>
-      </div>
-
-      {/* Shop setup prompt if no shop */}
-      {!shop && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="flex items-center gap-4 p-4">
-            <AlertCircle className="w-6 h-6 text-orange-500 shrink-0" />
-            <div className="flex-1">
-              <p className="font-medium">Complete Your Shop Setup</p>
-              <p className="text-sm text-muted-foreground">
-                Add your shop details to start using all features.
-              </p>
-            </div>
-            <Link href="/settings">
-              <Button size="sm">Setup</Button>
-            </Link>
-          </CardContent>
-        </Card>
+      {/* Stat Cards */}
+      {isLoading ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            title="Revenue"
+            value={formatCurrency(stats.sales)}
+            icon={DollarSign}
+            bgColor="#FFF3E0"
+            iconColor="#F97316"
+          />
+          <StatCard
+            title="Orders"
+            value={String(stats.orders)}
+            icon={ShoppingBag}
+            bgColor="#E8F5E9"
+            iconColor="#22C55E"
+          />
+          <StatCard
+            title="Products"
+            value={String(products.length)}
+            icon={Package}
+            bgColor="#F3E5F5"
+            iconColor="#A855F7"
+          />
+          <StatCard
+            title="Avg Order"
+            value={formatCurrency(stats.avgOrder)}
+            icon={TrendingUp}
+            bgColor="#E3F2FD"
+            iconColor="#3B82F6"
+          />
+        </div>
       )}
+
+      {/* Chart + Low Stock */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <RevenueChart shopId={shop?.id ?? ''} />
+        </div>
+        <LowStockAlert products={lowStock} />
+      </div>
+
+      {/* Recent Transactions + Top Products */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <RecentTransactions transactions={transactions} isLoading={statsLoading} />
+        <TopProducts topProducts={topProducts} />
+      </div>
     </div>
   );
 }

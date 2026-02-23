@@ -51,6 +51,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       products: {
         Row: {
@@ -113,6 +114,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       transactions: {
         Row: {
@@ -157,6 +159,7 @@ export interface Database {
           notes?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
     };
     Views: {
@@ -173,14 +176,17 @@ export interface Database {
 
 // Helper types
 export interface TransactionItem {
-  product_id: string;
-  name: string;
-  name_ml: string;
+  product_id?: string;
+  name?: string;
+  product_name?: string;
+  name_ml?: string;
+  product_name_ml?: string;
   quantity: number;
-  unit: string;
-  price: number;
-  gst_rate: number;
-  gst_amount: number;
+  unit?: string;
+  price?: number;
+  unit_price?: number;
+  gst_rate?: number;
+  gst_amount?: number;
   total: number;
 }
 
