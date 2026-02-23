@@ -39,7 +39,7 @@ export default function OnboardingPage() {
     { id: '1', name_en: '', name_ml: '', price: '', unit: 'kg', stock: '' }
   ]);
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refreshShop } = useAuth();
   const supabase = createClient();
 
   async function handleShopSubmit(e: React.FormEvent) {
@@ -61,6 +61,7 @@ export default function OnboardingPage() {
         gstin: shopData.gstin.trim() || null,
       });
       if (dbError) throw dbError;
+      await refreshShop();
       setStep(2);
     } catch (err: any) {
       setError(err.message || 'Failed to save shop details');
