@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { Search, Plus, Pencil, Trash2, Package } from 'lucide-react';
 import type { Product } from '@/types/database';
 
-const UNITS = ['piece', 'kg', 'g', 'liter', 'ml', 'dozen', 'box', 'packet'];
+const UNITS = ['piece', 'kg', 'g', 'liter', 'ml', 'dozen', 'box', 'packet', 'pack'];
 
 const EMPTY_FORM = {
   name_en: '',
@@ -118,10 +118,6 @@ export default function InventoryPage() {
     onResult: handleVoiceResult,
     onError: (error) => console.error('Voice error:', error),
   });
-
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
 
   // Unique categories derived from products
   const categories = [

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Product } from '@/types/database';
 import { KERALA_PRODUCTS } from '@/lib/data/products';
@@ -15,7 +15,7 @@ const DEMO_PRODUCTS: Product[] = KERALA_PRODUCTS.map((p, index) => ({
   price: p.price,
   cost_price: p.cost_price,
   unit: p.unit,
-  stock: Math.floor(Math.random() * 90) + 10, // 10–100 random stock for demo
+  stock: Math.floor(Math.random() * 90) + 10,
   min_stock: p.min_stock,
   gst_rate: p.gst_rate,
   aliases: p.aliases,
@@ -106,9 +106,10 @@ function searchProduct(products: Product[], query: string): Product | null {
 }
 
 export function useProducts({ shopId }: UseProductsOptions = {}) {
-  const [products, setProducts] = useState<Product[]>(DEMO_PRODUCTS);
-  const [isLoading, setIsLoading] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const hasLoadedRef = useRef(false);
 
   const supabase = createClient();
   const isDemoMode = supabase === null;
@@ -118,10 +119,13 @@ export function useProducts({ shopId }: UseProductsOptions = {}) {
    */
   const loadProducts = useCallback(async () => {
     if (isDemoMode || !shopId) {
+      console.log('[Products] Using demo products (isDemoMode:', isDemoMode, ', shopId:', shopId, ')');
       setProducts(DEMO_PRODUCTS);
+      setIsLoading(false);
       return;
     }
 
+    console.log('[Products] Loading from Supabase for shop:', shopId);
     setIsLoading(true);
     setError(null);
 
@@ -133,15 +137,22 @@ export function useProducts({ shopId }: UseProductsOptions = {}) {
         .order('name_en');
 
       if (supabaseError) throw supabaseError;
+      console.log('[Products] Loaded', data?.length ?? 0, 'products from Supabase');
       setProducts(data || []);
     } catch (err) {
-      console.error('Error loading products:', err);
+      console.error('[Products] Error loading products:', err);
       setError(err as Error);
-      setProducts(DEMO_PRODUCTS); // Fallback to demo
+      setProducts(DEMO_PRODUCTS);
     } finally {
       setIsLoading(false);
     }
   }, [isDemoMode, shopId, supabase]);
+
+  // Auto-load products when shopId changes
+  useEffect(() => {
+    loadProducts();
+    hasLoadedRef.current = true;
+  }, [loadProducts]);
 
   /**
    * Search for a product by name/alias

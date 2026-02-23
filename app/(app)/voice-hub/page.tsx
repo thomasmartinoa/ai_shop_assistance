@@ -90,9 +90,6 @@ export default function VoiceHubPage() {
     return { subtotal: sub, gstAmount: gst, total: sub + gst };
   }, [cart]);
 
-  // ── Load products on mount ─────────────────────────────────────────────────
-  useEffect(() => { loadProducts(); }, [loadProducts]);
-
   // ─── Low stock products (derived) ─────────────────────────────────────────
   const lowStock = useMemo(
     () => products.filter((p) => p.stock > 0 && p.stock <= (p.min_stock ?? 5)),
