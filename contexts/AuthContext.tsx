@@ -108,39 +108,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     console.log('[Auth] Initializing auth...');
-    console.log('[Auth] Current URL:', typeof window !== 'undefined' ? window.location.href : 'SSR');
 
-    // Listen for auth changes — the Supabase client auto-handles ?code= and #access_token=
+    // Safety timeout — never spin forever
+    const timeout = setTimeout(() => {
+      console.warn('[Auth] Auth init timed out after 8s, forcing loaded state');
+      setIsLoading(false);
+    }, 8000);
+
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[Auth] onAuthStateChange:', event, session ? 'has session' : 'no session');
         setSession(session);
         setUser(session?.user ?? null);
 
-        if (session?.user) {
-          await fetchShop(session.user.id);
-        } else {
-          setShop(null);
+        try {
+          if (session?.user) {
+            await fetchShop(session.user.id);
+          } else {
+            setShop(null);
+          }
+        } catch (err) {
+          console.error('[Auth] fetchShop error in onAuthStateChange:', err);
         }
+        clearTimeout(timeout);
         setIsLoading(false);
       }
     );
 
-    // Get the current session (waits for client init including code exchange)
+    // Get the current session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       console.log('[Auth] getSession result:', session ? 'has session' : 'no session');
-      if (session) {
-        setSession(session);
-        setUser(session.user);
-        await fetchShop(session.user.id);
+      try {
+        if (session) {
+          setSession(session);
+          setUser(session.user);
+          await fetchShop(session.user.id);
+        }
+      } catch (err) {
+        console.error('[Auth] fetchShop error in getSession:', err);
       }
+      clearTimeout(timeout);
       setIsLoading(false);
     }).catch((err) => {
       console.error('[Auth] getSession error:', err);
+      clearTimeout(timeout);
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, [supabase, fetchShop, isSupabaseConfigured]);
 
   // Sign in with Google OAuth
