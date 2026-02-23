@@ -115,7 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }, 8000);
 
-    // Listen for auth changes
+    // Use ONLY onAuthStateChange for initialization.
+    // It fires INITIAL_SESSION after processing URL hash (OAuth callback),
+    // avoiding the race condition where getSession() returns a stale session.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[Auth] onAuthStateChange:', event, session ? 'has session' : 'no session');
@@ -129,32 +131,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setShop(null);
           }
         } catch (err) {
-          console.error('[Auth] fetchShop error in onAuthStateChange:', err);
+          console.error('[Auth] fetchShop error:', err);
         }
         clearTimeout(timeout);
         setIsLoading(false);
       }
     );
-
-    // Get the current session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('[Auth] getSession result:', session ? 'has session' : 'no session');
-      try {
-        if (session) {
-          setSession(session);
-          setUser(session.user);
-          await fetchShop(session.user.id);
-        }
-      } catch (err) {
-        console.error('[Auth] fetchShop error in getSession:', err);
-      }
-      clearTimeout(timeout);
-      setIsLoading(false);
-    }).catch((err) => {
-      console.error('[Auth] getSession error:', err);
-      clearTimeout(timeout);
-      setIsLoading(false);
-    });
 
     return () => {
       clearTimeout(timeout);
