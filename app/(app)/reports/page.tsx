@@ -1,191 +1,190 @@
 'use client';
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { formatCurrency } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTransactions, type Period } from '@/hooks/useTransactions';
+import { useState, useMemo } from 'react';
+import { Download, TrendingUp, ShoppingCart } from 'lucide-react';
 import {
-  TrendingUp,
-  TrendingDown,
-  IndianRupee,
-  ShoppingCart,
-  Calendar,
-  Download,
-  Loader2,
-  AlertCircle,
-  PackageOpen,
-} from 'lucide-react';
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  PieChart, Pie, Cell,
+} from 'recharts';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTransactions } from '@/hooks/useTransactions';
+import { StatCard } from '@/components/ui/stat-card';
+import { Button } from '@/components/ui/button';
+
+type Period = 'week' | 'month' | 'year';
+
+const COLORS = ['#F97316', '#64748b'];
 
 export default function ReportsPage() {
-  const { shop, isDemoMode } = useAuth();
-  const [period, setPeriod] = useState<Period>('today');
-  const { stats, topProducts, isLoading, error } = useTransactions(shop?.id, period);
+  const { shop } = useAuth();
+  const { transactions, isLoading } = useTransactions(shop?.id);
+  const [period, setPeriod] = useState<Period>('week');
 
-  const periodLabel = period === 'today' ? 'today' : period === 'week' ? 'this week' : 'this month';
+  const filteredTx = useMemo(() => {
+    const now = new Date();
+    return transactions.filter(tx => {
+      const d = new Date(tx.created_at);
+      if (period === 'week') { const w = new Date(now); w.setDate(now.getDate() - 7); return d >= w; }
+      if (period === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      return d.getFullYear() === now.getFullYear();
+    });
+  }, [transactions, period]);
+
+  const totalRevenue = filteredTx.reduce((s, t) => s + Number(t.total), 0);
+  const avgOrder = filteredTx.length > 0 ? totalRevenue / filteredTx.length : 0;
+  const daysActive = new Set(filteredTx.map(t => new Date(t.created_at).toDateString())).size;
+
+  // Group by day for line chart
+  const chartData = useMemo(() => {
+    const groups: Record<string, number> = {};
+    filteredTx.forEach(tx => {
+      const key = new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      groups[key] = (groups[key] || 0) + Number(tx.total);
+    });
+    return Object.entries(groups).map(([date, revenue]) => ({ date, revenue: parseFloat(revenue.toFixed(2)) }));
+  }, [filteredTx]);
+
+  // Payment method breakdown for pie
+  const pieData = useMemo(() => {
+    const cash = filteredTx.filter(t => t.payment_method === 'cash').reduce((s, t) => s + Number(t.total), 0);
+    const upi = filteredTx.filter(t => t.payment_method === 'upi').reduce((s, t) => s + Number(t.total), 0);
+    return [
+      { name: 'Cash', value: parseFloat(cash.toFixed(2)) },
+      { name: 'UPI', value: parseFloat(upi.toFixed(2)) },
+    ].filter(d => d.value > 0);
+  }, [filteredTx]);
+
+  // Top products by revenue
+  const topProducts = useMemo(() => {
+    const map: Record<string, { name: string; qty: number; revenue: number }> = {};
+    filteredTx.forEach(tx => {
+      const items = Array.isArray(tx.items) ? tx.items : [];
+      items.forEach(item => {
+        const name = item.product_name || item.name_en || item.name || 'Unknown';
+        const qty = item.quantity ?? item.qty ?? 0;
+        const revenue = item.total ?? ((item.unit_price ?? item.price ?? 0) * qty);
+        if (!map[name]) map[name] = { name, qty: 0, revenue: 0 };
+        map[name].qty += Number(qty);
+        map[name].revenue += Number(revenue);
+      });
+    });
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  }, [filteredTx]);
+
+  function exportCSV() {
+    const rows = [
+      ['Date', 'Time', 'Items', 'Total', 'Payment'],
+      ...filteredTx.map(tx => {
+        const items = Array.isArray(tx.items) ? tx.items : [];
+        return [
+          new Date(tx.created_at).toLocaleDateString('en-IN'),
+          new Date(tx.created_at).toLocaleTimeString('en-IN'),
+          items.map(i => `${i.product_name || i.name || i.name_en || 'Item'} x${i.quantity ?? i.qty ?? 0}`).join('; '),
+          Number(tx.total).toFixed(2),
+          tx.payment_method || 'cash',
+        ];
+      }),
+    ];
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `sales-report-${period}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Reports</h2>
-          <p className="text-muted-foreground">
-            Sales analytics and performance metrics
-          </p>
+          <h1 className="text-xl font-bold">Reports &amp; Analytics</h1>
+          <p className="text-sm text-muted-foreground">{filteredTx.length} transactions</p>
         </div>
-        <Button variant="outline" disabled>
-          <Download className="w-4 h-4 mr-2" />
-          Export
-        </Button>
-      </div>
-
-      {/* Demo mode banner */}
-      {isDemoMode && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300 text-sm">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          Demo mode — connect Supabase to see real sales data.
-        </div>
-      )}
-
-      {/* Error banner */}
-      {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {/* Period selector */}
-      <div className="flex gap-2">
-        {(['today', 'week', 'month'] as Period[]).map((p) => (
-          <Button
-            key={p}
-            variant={period === p ? 'default' : 'outline'}
-            onClick={() => setPeriod(p)}
-            className="capitalize"
-          >
-            {p === 'today' ? 'Today' : p === 'week' ? 'This Week' : 'This Month'}
+        <div className="flex gap-2">
+          <div className="flex gap-1 bg-muted/50 rounded-xl p-1">
+            {(['week', 'month', 'year'] as Period[]).map(p => (
+              <button key={p} onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors capitalize ${period === p ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground'}`}>
+                {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
+              </button>
+            ))}
+          </div>
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download className="h-3.5 w-3.5 mr-1.5" /> CSV
           </Button>
-        ))}
+        </div>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <IndianRupee className="w-4 h-4" />
-              Total Sales
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            ) : (
-              <>
-                <p className="text-3xl font-bold">{formatCurrency(stats.sales)}</p>
-                <p className="text-sm text-muted-foreground mt-1">{periodLabel}</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4" />
-              Orders
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            ) : (
-              <>
-                <p className="text-3xl font-bold">{stats.orders}</p>
-                <p className="text-sm text-muted-foreground mt-1">transactions completed</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              Avg. Order Value
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            ) : (
-              <>
-                <p className="text-3xl font-bold">{formatCurrency(stats.avgOrder)}</p>
-                <p className="text-sm text-muted-foreground mt-1">per transaction</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Revenue"
+          value={isLoading ? '…' : `₹${totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 0 })}`}
+          icon={TrendingUp}
+          variant="success"
+        />
+        <StatCard title="Orders" value={isLoading ? '…' : filteredTx.length.toString()} icon={ShoppingCart} />
+        <StatCard title="Avg Order" value={isLoading ? '…' : `₹${avgOrder.toFixed(0)}`} icon={TrendingUp} />
+        <StatCard title="Days Active" value={isLoading ? '…' : daysActive.toString()} icon={TrendingUp} />
       </div>
 
-      {/* Top products */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Top Selling Products</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : topProducts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-              <PackageOpen className="w-10 h-10 mb-3 opacity-40" />
-              <p className="text-sm">No sales recorded {periodLabel}.</p>
-              <p className="text-xs mt-1">Complete some bills to see data here.</p>
-            </div>
+      {/* Revenue chart */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+        <h2 className="font-semibold mb-4">Revenue Trend</h2>
+        {typeof window !== 'undefined' && chartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v}`} />
+              <Tooltip formatter={(v) => [`₹${Number(v).toFixed(2)}`, 'Revenue']} />
+              <Line type="monotone" dataKey="revenue" stroke="#F97316" strokeWidth={2.5} dot={{ fill: '#F97316', r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">No data for this period</div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Pie chart */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <h2 className="font-semibold mb-4">Payment Methods</h2>
+          {typeof window !== 'undefined' && pieData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" outerRadius={75} dataKey="value"
+                  label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                  {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(v) => `₹${Number(v).toFixed(2)}`} />
+              </PieChart>
+            </ResponsiveContainer>
           ) : (
-            <div className="space-y-4">
-              {topProducts.map((product, index) => (
-                <div
-                  key={product.name}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-xs font-medium">
-                      {index + 1}
-                    </span>
-                    <span className="font-medium">{product.name}</span>
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No payment data</div>
+          )}
+        </div>
+
+        {/* Top products */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-5">
+          <h2 className="font-semibold mb-4">Top Products</h2>
+          {topProducts.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">No sales data</p>
+          ) : (
+            <div className="space-y-2">
+              {topProducts.map((p, i) => (
+                <div key={p.name} className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-muted-foreground w-4">{i + 1}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{p.qty} units sold</p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatCurrency(product.revenue)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {product.qty} sold
-                    </p>
-                  </div>
+                  <span className="text-sm font-bold">₹{p.revenue.toFixed(0)}</span>
                 </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Sales chart placeholder */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sales Trend</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-48 bg-muted/50 rounded-lg flex items-center justify-center">
-            <p className="text-muted-foreground text-sm">
-              Chart visualization coming soon
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

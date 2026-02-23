@@ -1,605 +1,156 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useVoice } from '@/hooks/useVoice';
-import { useProducts } from '@/hooks/useProducts';
-import { useSmartNLP, type NLPResult } from '@/lib/nlp/useSmartNLP';
-import { VoiceButton } from '@/components/voice/VoiceButton';
-import { VoiceVisualizer } from '@/components/voice/VoiceVisualizer';
-import { UpiQrCode } from '@/components/billing/UpiQrCode';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { formatCurrency } from '@/lib/utils';
-import { ML_RESPONSES } from '@/lib/constants';
+import { useState, useMemo } from 'react';
+import { ShoppingCart, TrendingUp, Calculator, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/shared/Toast';
-import { getSupabaseClient } from '@/lib/supabase/client';
-import {
-  Trash2,
-  QrCode,
-  Printer,
-  IndianRupee,
-  ShoppingCart,
-  Plus,
-  Minus,
-  Check,
-} from 'lucide-react';
+import { useTransactions } from '@/hooks/useTransactions';
+import { StatCard } from '@/components/ui/stat-card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
-interface CartItem {
-  id: string;
-  name: string;
-  nameMl: string;
-  quantity: number;
-  unit: string;
-  price: number;
-  gstRate: number;
-  total: number;
-}
-
-// Conversation states for billing flow
-type ConversationState =
-  | 'idle'           // Waiting for commands
-  | 'awaiting_confirmation'  // Asked "anything else?" waiting for response
-  | 'processing_payment';    // Showing QR/completing payment
+type DateFilter = 'today' | 'week' | 'month';
 
 export default function BillingPage() {
-  const { shop, isDemoMode } = useAuth();
-  const { findProduct, loadProducts } = useProducts({ shopId: shop?.id });
-  const { processText, isProcessing, lastResult } = useSmartNLP();
-  const { showToast } = useToast();
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [showQR, setShowQR] = useState(false);
-  const [paymentComplete, setPaymentComplete] = useState(false);
-  const [conversationState, setConversationState] = useState<ConversationState>('idle');
-  const [lastAddedItem, setLastAddedItem] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { shop } = useAuth();
+  const { transactions, isLoading } = useTransactions(shop?.id);
+  const [filter, setFilter] = useState<DateFilter>('today');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Create a ref for the voice API to break circular dependency
-  const voiceApiRef = useRef<{
-    speak: (text: string, lang?: string) => Promise<void>;
-    cancelSpeech: () => void;
-  } | null>(null);
-
-  // Helper function to safely call voice.speak
-  const speakText = useCallback((text: string) => {
-    voiceApiRef.current?.speak(text);
-  }, []);
-
-  // Load products on mount
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
-
-  // Calculate totals with memoization to prevent unnecessary recalculations
-  const { subtotal, gstAmount, total } = useMemo(() => {
-    const sub = cart.reduce((sum, item) => sum + item.total, 0);
-    const gst = cart.reduce((sum, item) => sum + (item.total * item.gstRate) / 100, 0);
-    return { subtotal: sub, gstAmount: gst, total: sub + gst };
-  }, [cart]);
-
-  // Complete transaction: save to Supabase and decrement stock
-  const completeTransaction = useCallback(async (paymentMethod: 'cash' | 'upi') => {
-    if (cart.length === 0) return;
-    setIsSaving(true);
-
-    try {
-      const supabase = getSupabaseClient();
-
-      if (supabase && !isDemoMode && shop) {
-        // Build transaction items
-        const items = cart.map((item) => ({
-          product_name: item.name,
-          product_name_ml: item.nameMl,
-          quantity: item.quantity,
-          unit: item.unit,
-          unit_price: item.price,
-          gst_rate: item.gstRate,
-          total: item.total,
-        }));
-
-        // Insert transaction
-        const { error: txError } = await supabase.from('transactions').insert({
-          shop_id: shop.id,
-          items,
-          subtotal,
-          gst_amount: gstAmount,
-          total,
-          payment_method: paymentMethod,
-          payment_status: 'completed',
-        });
-
-        if (txError) {
-          console.error('Transaction save error:', txError);
-          showToast('Failed to save transaction', 'error');
-        }
-
-        // Decrement stock for each cart item
-        for (const item of cart) {
-          // Find product by name to get its ID
-          const product = findProduct(item.name);
-          if (product) {
-            const newStock = Math.max(0, (product.stock ?? 0) - item.quantity);
-            const { error: stockError } = await supabase
-              .from('products')
-              .update({ stock: newStock })
-              .eq('id', product.id);
-
-            if (stockError) {
-              console.error(`Stock update error for ${item.name}:`, stockError);
-            }
-          }
-        }
+  const filteredTx = useMemo(() => {
+    const now = new Date();
+    return transactions.filter(tx => {
+      const txDate = new Date(tx.created_at);
+      if (filter === 'today') return txDate.toDateString() === now.toDateString();
+      if (filter === 'week') {
+        const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+        return txDate >= weekAgo;
       }
-
-      showToast(`Payment of ${formatCurrency(total)} received (${paymentMethod.toUpperCase()})`, 'success');
-      setCart([]);
-      setConversationState('idle');
-      loadProducts(); // Refresh stock
-    } catch (error) {
-      console.error('Complete transaction error:', error);
-      showToast('Error completing transaction', 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  }, [cart, shop, isDemoMode, subtotal, gstAmount, total, findProduct, loadProducts, showToast]);
-
-  // Handle voice result with Smart NLP - Conversational Flow
-  const handleVoiceResult = useCallback(
-    async (transcript: string, isFinal: boolean) => {
-      if (!isFinal) return;
-
-      console.log('📱 Billing: Voice result received:', transcript);
-
-      // Process through Smart NLP (Dialogflow + local fallback)
-      const result = await processText(transcript);
-
-      console.log('📱 Billing: NLP result:', result.intent, 'confidence:', result.confidence);
-
-      // Check if user is responding to "anything else?" confirmation
-      if (conversationState === 'awaiting_confirmation') {
-        console.log('📱 Billing: In awaiting_confirmation state');
-        // User wants to add more items
-        if (result.intent === 'billing.add' ||
-          /കൂടി|more|വേറെ|add|ചേർക്കുക|ഇനി|വേണം|ഉണ്ട്/i.test(transcript)) {
-          console.log('📱 Billing: User wants to add more items');
-          setConversationState('idle');
-          if (result.intent !== 'billing.add') {
-            voice.speak('ശരി, എന്താണ് വേണ്ടത്?');
-            return;
-          }
-        }
-        // User confirms billing (yes/done/bill it/no more)
-        else if (result.intent === 'confirm' ||
-          result.intent === 'billing.complete' ||
-          result.intent === 'billing.total' ||
-          /ശരി|ഇല്ല|മതി|അത്രതന്നെ|bill|ബിൽ|done|കഴിഞ്ഞു|no more|അത്ര|that's all|proceed/i.test(transcript)) {
-          console.log('📱 Billing: User confirmed billing');
-          setConversationState('processing_payment');
-          const totalAmount = Math.round(total);
-          voice.speak(`ശരി, ആകെ തുക ${totalAmount} രൂപ. പേയ്‌മെൻ്റ് എങ്ങനെ? UPI അല്ലെങ്കിൽ കാഷ്?`);
-          return;
-        }
-        // User wants to cancel
-        else if (result.intent === 'cancel' || /cancel|റദ്ദാക്കുക|വേണ്ട/i.test(transcript)) {
-          console.log('📱 Billing: User cancelled');
-          setConversationState('idle');
-          voice.speak('ശരി, ഇനിയും ഉൽപ്പന്നങ്ങൾ ചേർക്കാം');
-          return;
-        }
+      if (filter === 'month') {
+        return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
       }
+      return true;
+    });
+  }, [transactions, filter]);
 
-      // Check if user is responding to payment method question
-      if (conversationState === 'processing_payment') {
-        if (result.intent === 'payment.upi' || /upi|qr|gpay|phonepay|google pay|paytm/i.test(transcript)) {
-          setShowQR(true);
-          voice.speak('QR കോഡ് കാണിക്കുന്നു. സ്കാൻ ചെയ്തു പേയ്മെൻ്റ് ചെയ്യൂ');
-          return;
-        }
-        if (result.intent === 'payment.cash' || /cash|കാഷ്|പണം|നോട്ട്/i.test(transcript)) {
-          await completeTransaction('cash');
-          voice.speak('കാഷ് പേയ്മെൻ്റ്. നന്ദി!');
-          return;
-        }
-      }
-
-      // Process based on intent
-      switch (result.intent) {
-        case 'billing.add':
-          const productName = result.entities.product;
-          const quantity = result.entities.quantity || 1;
-
-          if (productName) {
-            // Search for product in database
-            const product = findProduct(productName);
-
-            if (product) {
-              const newItem: CartItem = {
-                id: Date.now().toString(),
-                name: product.name_en,
-                nameMl: product.name_ml,
-                quantity,
-                unit: product.unit,
-                price: product.price,
-                gstRate: product.gst_rate,
-                total: quantity * product.price,
-              };
-
-              setCart((prev) => [...prev, newItem]);
-              setLastAddedItem(product.name_ml);
-              setConversationState('awaiting_confirmation');
-
-              // Ask if they want to add more - in Malayalam
-              const unitText = product.unit === 'kg' ? 'കിലോ' : product.unit === 'litre' ? 'ലിറ്റർ' : 'എണ്ണം';
-              voice.speak(`${quantity} ${unitText} ${product.name_ml} ചേർത്തു. ഇനിയും വേണോ, അതോ ബിൽ ചെയ്യട്ടെ?`);
-            } else {
-              voice.speak(`${productName} കണ്ടെത്തിയില്ല. വേറെ പേര് പറയൂ`);
-            }
-          } else {
-            voice.speak('ഉൽപ്പന്നത്തിൻ്റെ പേര് പറയൂ');
-          }
-          break;
-
-        case 'billing.remove':
-          const removeProduct = result.entities.product;
-          if (removeProduct) {
-            const itemToRemove = cart.find(item =>
-              item.name.toLowerCase().includes(removeProduct.toLowerCase()) ||
-              item.nameMl.includes(removeProduct)
-            );
-            if (itemToRemove) {
-              setCart((prev) =>
-                prev.filter((item) => item.id !== itemToRemove.id)
-              );
-              voice.speak(`${itemToRemove.nameMl} ബില്ലിൽ നിന്ന് മാറ്റി. ഇനിയും വേണോ?`);
-              setConversationState('awaiting_confirmation');
-            } else {
-              voice.speak(`${removeProduct} ബില്ലിൽ ഇല്ല`);
-            }
-          } else {
-            voice.speak('ഏത് ഉൽപ്പന്നം മാറ്റണം?');
-          }
-          break;
-
-        case 'billing.clear':
-          setCart([]);
-          setConversationState('idle');
-          voice.speak('ബിൽ ക്ലിയർ ചെയ്തു. പുതിയ ബിൽ തുടങ്ങാം');
-          break;
-
-        case 'billing.total':
-          if (cart.length > 0) {
-            const totalAmount = Math.round(total);
-            voice.speak(`ആകെ ${cart.length} ഉൽപ്പന്നങ്ങൾ, തുക ${totalAmount} രൂപ. ബിൽ ചെയ്യട്ടെ?`);
-            setConversationState('awaiting_confirmation');
-          } else {
-            voice.speak('ബില്ലിൽ ഒന്നും ഇല്ല. എന്താണ് വേണ്ടത്?');
-          }
-          break;
-
-        case 'billing.complete':
-          if (cart.length > 0) {
-            setConversationState('processing_payment');
-            const totalAmount = Math.round(total);
-            voice.speak(`ശരി, ആകെ തുക ${totalAmount} രൂപ. UPI അല്ലെങ്കിൽ കാഷ്?`);
-          } else {
-            voice.speak('ബില്ലിൽ ഒന്നും ഇല്ല');
-          }
-          break;
-
-        case 'payment.upi':
-          if (cart.length > 0) {
-            setShowQR(true);
-            setConversationState('processing_payment');
-            voice.speak(`ആകെ ${Math.round(total)} രൂപ. QR കോഡ് കാണിക്കുന്നു`);
-          } else {
-            voice.speak('ആദ്യം ബില്ലിൽ ഉൽപ്പന്നങ്ങൾ ചേർക്കൂ');
-          }
-          break;
-
-        case 'confirm':
-          if (conversationState === 'idle' && cart.length > 0) {
-            setConversationState('processing_payment');
-            voice.speak(`ആകെ ${Math.round(total)} രൂപ. UPI അല്ലെങ്കിൽ കാഷ്?`);
-          } else {
-            voice.speak('ശരി');
-          }
-          break;
-
-        case 'cancel':
-          setConversationState('idle');
-          voice.speak('റദ്ദാക്കി');
-          break;
-
-        case 'greeting':
-          voice.speak('നമസ്കാരം! എന്ത് സഹായം വേണം?');
-          break;
-
-        case 'help':
-          voice.speak('നിങ്ങൾക്ക് ഉൽപ്പന്നങ്ങൾ ബില്ലിൽ ചേർക്കാം. ഉദാഹരണം: രണ്ട് കിലോ അരി');
-          break;
-
-        default:
-          voice.speak(ML_RESPONSES.notUnderstood);
-      }
-    },
-    [total, processText, findProduct, conversationState, cart]
-  );
-
-  const voice = useVoice({
-    onResult: handleVoiceResult,
-    onError: (error) => console.error('Voice error:', error),
-  });
-
-  // Update quantity
-  const updateQuantity = (id: string, delta: number) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-            ...item,
-            quantity: Math.max(0, item.quantity + delta),
-            total: Math.max(0, item.quantity + delta) * item.price,
-          }
-          : item
-      ).filter((item) => item.quantity > 0)
-    );
-  };
-
-  // Remove item
-  const removeItem = (id: string) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
-  };
+  const totalRevenue = filteredTx.reduce((s, t) => s + Number(t.total), 0);
+  const avgOrder = filteredTx.length > 0 ? totalRevenue / filteredTx.length : 0;
 
   return (
     <div className="space-y-6">
-      {/* Voice Section */}
-      <Card>
-        <CardContent className="p-6 flex flex-col items-center">
-          <VoiceButton
-            state={voice.state}
-            onToggle={voice.toggleListening}
-            disabled={!voice.isSupported}
-          />
-
-          <VoiceVisualizer
-            state={voice.state}
-            transcript={voice.interimTranscript || voice.transcript}
-            className="mt-4"
-          />
-
-          {/* Conversation State Indicator */}
-          {conversationState !== 'idle' && (
-            <div className={`mt-4 px-4 py-2 rounded-lg text-center animate-pulse ${conversationState === 'awaiting_confirmation'
-              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200'
-              : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
-              }`}>
-              {conversationState === 'awaiting_confirmation' && (
-                <div>
-                  <p className="font-medium">ഇനിയും വേണോ?</p>
-                  <p className="text-sm opacity-75">
-                    "ഇനിയും വേണം" / "അത്രതന്നെ, ബിൽ ചെയ്യൂ"
-                  </p>
-                </div>
-              )}
-              {conversationState === 'processing_payment' && (
-                <div>
-                  <p className="font-medium">പേയ്‌മെൻ്റ് രീതി?</p>
-                  <p className="text-sm opacity-75">
-                    "UPI" / "കാഷ്"
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Last intent debug (dev only) */}
-          {lastResult && process.env.NODE_ENV === 'development' && (
-            <div className="mt-4 text-xs text-muted-foreground">
-              Intent: {lastResult.intent} ({(lastResult.confidence * 100).toFixed(0)}%)
-              <span className="ml-2 text-blue-500">[{lastResult.source}]</span>
-              <span className="ml-2 text-purple-500">[{conversationState}]</span>
-            </div>
-          )}
-
-          {/* Test TTS button (dev only) */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-4 flex gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => voice.speak('നമസ്കാരം, എന്ത് സഹായം വേണം?')}
-              >
-                🔊 Test Malayalam TTS
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => voice.speak('Hello, how can I help you?', 'en-IN')}
-              >
-                🔊 Test English TTS
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Cart */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
-            Current Bill
-            {cart.length > 0 && (
-              <span className="text-sm font-normal text-muted-foreground ml-auto">
-                {cart.length} items
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {cart.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No items in bill</p>
-              <p className="text-sm">Press the microphone and say an item</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {cart.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between py-3 border-b last:border-0"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatCurrency(item.price)} / {item.unit}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-8 w-8"
-                      onClick={() => updateQuantity(item.id, -1)}
-                    >
-                      <Minus className="w-4 h-4" />
-                    </Button>
-                    <span className="w-8 text-center font-medium">
-                      {item.quantity}
-                    </span>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-8 w-8"
-                      onClick={() => updateQuantity(item.id, 1)}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                    <span className="w-20 text-right font-semibold">
-                      {formatCurrency(item.total)}
-                    </span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => removeItem(item.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-
-              {/* Totals */}
-              <div className="pt-4 space-y-2">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(subtotal)}</span>
-                </div>
-                {gstAmount > 0 && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>GST</span>
-                    <span>{formatCurrency(gstAmount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-xl font-bold pt-2 border-t">
-                  <span>Total</span>
-                  <span className="text-primary">{formatCurrency(total)}</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Action buttons */}
-      {cart.length > 0 && (
-        <div className="grid grid-cols-2 gap-4">
-          <Button
-            variant="outline"
-            size="lg"
-            className="flex-col gap-1 h-auto py-4"
-            onClick={() => setShowQR(true)}
-          >
-            <QrCode className="w-6 h-6" />
-            <span>UPI Payment</span>
-          </Button>
-          <Button
-            size="lg"
-            className="flex-col gap-1 h-auto py-4"
-            disabled={isSaving}
-            onClick={() => completeTransaction('cash')}
-          >
-            <IndianRupee className="w-6 h-6" />
-            <span>{isSaving ? 'Saving...' : 'Cash Payment'}</span>
-          </Button>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold">Transactions</h1>
+          <p className="text-sm text-muted-foreground">{filteredTx.length} records</p>
         </div>
-      )}
-
-      {/* QR Modal */}
-      {showQR && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowQR(false)}
-        >
-          <Card className="max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            <CardHeader>
-              <CardTitle className="text-center">
-                {paymentComplete ? 'Payment Received!' : 'Scan to Pay'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center gap-4">
-              {paymentComplete ? (
-                <div className="w-48 h-48 bg-green-100 rounded-lg flex items-center justify-center">
-                  <Check className="w-24 h-24 text-green-600" />
-                </div>
-              ) : (
-                <UpiQrCode
-                  upiId={shop?.upi_id || ''}
-                  payeeName={shop?.name || 'Shop'}
-                  amount={total}
-                  transactionNote={`Bill #${Date.now().toString().slice(-6)}`}
-                  size={192}
-                />
+        {/* Filter chips */}
+        <div className="flex gap-1.5 bg-muted/50 rounded-xl p-1">
+          {(['today', 'week', 'month'] as DateFilter[]).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors capitalize',
+                filter === f ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
               )}
-              <p className="text-2xl font-bold text-primary">
-                {formatCurrency(total)}
-              </p>
-              <p className="text-sm text-muted-foreground">GPay / PhonePe / UPI</p>
-              <div className="flex gap-2 w-full">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setShowQR(false);
-                    setPaymentComplete(false);
-                  }}
-                >
-                  Close
-                </Button>
-                {!paymentComplete && (
-                  <Button
-                    className="flex-1"
-                    disabled={isSaving}
-                    onClick={async () => {
-                      setPaymentComplete(true);
-                      await completeTransaction('upi');
-                      setTimeout(() => {
-                        setShowQR(false);
-                        setPaymentComplete(false);
-                      }, 2000);
-                    }}
+            >
+              {f === 'today' ? 'Today' : f === 'week' ? 'This Week' : 'This Month'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard
+          title="Revenue"
+          value={isLoading ? '…' : `₹${totalRevenue.toFixed(0)}`}
+          icon={TrendingUp}
+          variant="success"
+        />
+        <StatCard
+          title="Orders"
+          value={isLoading ? '…' : filteredTx.length.toString()}
+          icon={ShoppingCart}
+        />
+        <StatCard
+          title="Avg Order"
+          value={isLoading ? '…' : `₹${avgOrder.toFixed(0)}`}
+          icon={Calculator}
+        />
+      </div>
+
+      {/* Transactions list */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="p-6 text-center text-muted-foreground text-sm">Loading...</div>
+        ) : filteredTx.length === 0 ? (
+          <div className="p-12 text-center">
+            <ShoppingCart className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+            <p className="text-muted-foreground font-medium">No transactions</p>
+            <p className="text-sm text-muted-foreground/60 mt-1">Go to Voice Hub to start billing</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {filteredTx.map(tx => {
+              const items = Array.isArray(tx.items) ? tx.items : [];
+              const isExpanded = expandedId === tx.id;
+              const itemSummary = items.slice(0, 2).map(item =>
+                `${item.product_name || item.name || item.name_en || ''} ${item.quantity ?? item.qty ?? ''}${item.unit || ''}`
+              ).join(', ');
+              return (
+                <div key={tx.id}>
+                  <button
+                    onClick={() => setExpandedId(isExpanded ? null : tx.id)}
+                    className="w-full flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors text-left"
                   >
-                    {isSaving ? 'Saving...' : 'Mark as Paid'}
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {itemSummary}{items.length > 2 ? ` +${items.length - 2} more` : ''}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {new Date(tx.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        {' · '}
+                        {new Date(tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-sm">₹{Number(tx.total).toFixed(2)}</span>
+                      <Badge variant={tx.payment_method === 'upi' ? 'default' : 'secondary'} className="text-[10px]">
+                        {tx.payment_method?.toUpperCase() || 'CASH'}
+                      </Badge>
+                      {isExpanded
+                        ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                        : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="px-4 pb-4 bg-muted/20">
+                      <div className="space-y-1.5 pt-2">
+                        {items.map((item, i) => {
+                          const name = item.product_name || item.name || item.name_en || 'Item';
+                          const qty = item.quantity ?? item.qty ?? 0;
+                          const price = item.unit_price ?? item.price ?? 0;
+                          const lineTotal = item.total ?? (price * qty);
+                          return (
+                            <div key={i} className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">{name} × {qty} {item.unit || ''}</span>
+                              <span className="font-medium">₹{Number(lineTotal).toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                        <div className="flex justify-between text-sm font-bold pt-1 border-t border-border">
+                          <span>Total</span>
+                          <span>₹{Number(tx.total).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,25 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { Save, LogOut, Store, CreditCard, User, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { getSupabaseClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/shared/Toast';
-import { getSupabaseClient } from '@/lib/supabase/client';
-import {
-  Store,
-  Phone,
-  MapPin,
-  CreditCard,
-  FileText,
-  Save,
-  Loader2,
-} from 'lucide-react';
 
 export default function SettingsPage() {
-  const { shop, refreshShop, isDemoMode } = useAuth();
+  const { shop, refreshShop, isDemoMode, user, signOut } = useAuth();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -70,8 +61,8 @@ export default function SettingsPage() {
         if (error) throw error;
       } else {
         // New user — INSERT a new shop
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) {
           showToast('Please log in first', 'error');
           return;
         }
@@ -84,7 +75,7 @@ export default function SettingsPage() {
         const { error } = await supabase
           .from('shops')
           .insert({
-            owner_id: user.id,
+            owner_id: authUser.id,
             name: formData.name,
             name_ml: formData.nameMl || null,
             phone: formData.phone || null,
@@ -109,39 +100,32 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h2 className="text-2xl font-bold">Settings</h2>
-        <p className="text-muted-foreground">
-          Manage your shop information and preferences
-        </p>
+        <h1 className="text-xl font-bold">Settings</h1>
+        <p className="text-sm text-muted-foreground">Manage your shop configuration</p>
       </div>
 
       {/* New user setup prompt */}
       {!shop && !isDemoMode && (
-        <Card className="border-amber-300 bg-amber-50">
-          <CardContent className="flex items-start gap-3 p-4">
-            <Store className="w-6 h-6 text-amber-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-semibold text-amber-900">Welcome! Let's set up your shop</p>
-              <p className="text-sm text-amber-700 mt-1">
-                Fill in your shop name below and hit Save to create your shop. You can add more details later.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3">
+          <Store className="w-6 h-6 text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold text-amber-900">Welcome! Let's set up your shop</p>
+            <p className="text-sm text-amber-700 mt-1">
+              Fill in your shop name below and hit Save to create your shop. You can add more details later.
+            </p>
+          </div>
+        </div>
       )}
 
-      {/* Shop Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Store className="w-5 h-5" />
-            Shop Information
-          </CardTitle>
-          <CardDescription>
-            {shop ? 'Basic details about your shop' : 'Enter your shop details to get started'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* Shop Details Card */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-6">
+        <div className="flex items-center gap-2.5 mb-5">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Store className="h-4 w-4 text-primary" />
+          </div>
+          <h2 className="font-semibold">Shop Details</h2>
+        </div>
+        <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Shop Name (English)</Label>
@@ -164,12 +148,18 @@ export default function SettingsPage() {
               />
             </div>
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="phone" className="flex items-center gap-2">
-              <Phone className="w-4 h-4" />
-              Phone Number
-            </Label>
+            <Label htmlFor="address">Address</Label>
+            <Input
+              id="address"
+              name="address"
+              value={formData.address}
+              onChange={handleChange}
+              placeholder="Shop address..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
             <Input
               id="phone"
               name="phone"
@@ -179,35 +169,26 @@ export default function SettingsPage() {
               placeholder="+91 9876543210"
             />
           </div>
+          <Button onClick={handleSave} disabled={isLoading} className="w-full mt-2">
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Save Settings
+          </Button>
+        </div>
+      </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="address" className="flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Address
-            </Label>
-            <Input
-              id="address"
-              name="address"
-              value={formData.address}
-              onChange={handleChange}
-              placeholder="Shop address..."
-            />
+      {/* Payment Settings Card */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-6">
+        <div className="flex items-center gap-2.5 mb-5">
+          <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
+            <CreditCard className="h-4 w-4 text-green-600" />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Payment Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5" />
-            Payment Settings
-          </CardTitle>
-          <CardDescription>
-            Configure UPI and payment options
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          <h2 className="font-semibold">Payment Settings</h2>
+        </div>
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="upiId">UPI ID</Label>
             <Input
@@ -218,24 +199,9 @@ export default function SettingsPage() {
               placeholder="yourshop@upi"
             />
             <p className="text-xs text-muted-foreground">
-              This will be used to generate QR codes for customer payments
+              Used to generate QR codes for customer payments
             </p>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* GST Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            GST Information
-          </CardTitle>
-          <CardDescription>
-            Optional GST registration details for invoices
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="gstin">GSTIN</Label>
             <Input
@@ -249,23 +215,29 @@ export default function SettingsPage() {
               15-digit GST Identification Number (optional)
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Save button */}
-      <Button
-        size="lg"
-        className="w-full"
-        onClick={handleSave}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-        ) : (
-          <Save className="w-4 h-4 mr-2" />
-        )}
-        Save Settings
-      </Button>
+      {/* Account Card */}
+      <div className="bg-white rounded-2xl border border-border shadow-sm p-6">
+        <div className="flex items-center gap-2.5 mb-5">
+          <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+            <User className="h-4 w-4 text-blue-600" />
+          </div>
+          <h2 className="font-semibold">Account</h2>
+        </div>
+        <div className="space-y-3">
+          {user?.phone && (
+            <div className="flex justify-between items-center py-2 border-b border-border/50">
+              <span className="text-sm text-muted-foreground">Phone</span>
+              <span className="text-sm font-medium">{user.phone}</span>
+            </div>
+          )}
+          <Button variant="destructive" onClick={signOut} className="w-full mt-2">
+            <LogOut className="h-4 w-4 mr-2" /> Sign Out
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

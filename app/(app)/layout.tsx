@@ -1,49 +1,54 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/shared/Sidebar';
 import { Header } from '@/components/shared/Header';
-import { Loader2 } from 'lucide-react';
+import { BottomTabs } from '@/components/shared/BottomTabs';
+import { FloatingMic } from '@/components/shared/FloatingMic';
 
-export default function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading, isDemoMode, shop } = useAuth();
   const router = useRouter();
-  const { isLoading, isAuthenticated, shop } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
 
-  // Show loading state
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && !isDemoMode && !shop) {
+      router.push('/onboarding');
+    }
+  }, [isAuthenticated, isLoading, isDemoMode, shop, router]);
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+        <div className="text-center">
+          <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }
 
-  // Don't render if not authenticated
-  if (!isAuthenticated) {
-    return null;
-  }
+  if (!isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar />
+    <div className="min-h-screen bg-muted/30">
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="lg:pl-64">
-        <Header />
-        <main className="p-4 lg:p-6">
+        <Header onMenuToggle={() => setSidebarOpen(true)} />
+        <main className="p-4 lg:p-6 pb-24 lg:pb-8">
           {children}
         </main>
       </div>
+      <BottomTabs />
+      <FloatingMic />
     </div>
   );
 }

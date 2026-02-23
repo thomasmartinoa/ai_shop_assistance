@@ -1,76 +1,87 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatCurrency } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { useProducts } from '@/hooks/useProducts';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVoice } from '@/hooks/useVoice';
 import { useSmartNLP } from '@/lib/nlp/useSmartNLP';
 import { VoiceButton } from '@/components/voice/VoiceButton';
 import { VoiceVisualizer } from '@/components/voice/VoiceVisualizer';
-import {
-  Plus,
-  Search,
-  Package,
-  AlertTriangle,
-  Edit,
-  Trash2,
-  Grid,
-  List,
-  Mic,
-} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Search, Plus, Pencil, Trash2, Package } from 'lucide-react';
+import type { Product } from '@/types/database';
+
+const UNITS = ['piece', 'kg', 'g', 'liter', 'ml', 'dozen', 'box', 'packet'];
+
+const EMPTY_FORM = {
+  name_en: '',
+  name_ml: '',
+  price: '',
+  unit: 'piece',
+  stock: '',
+  min_stock: '10',
+  gst_rate: '0',
+  category: '',
+};
 
 export default function InventoryPage() {
   const { shop } = useAuth();
-  const { products, loadProducts, getLowStockProducts, addProduct, updateStock, findProduct } = useProducts({ shopId: shop?.id });
+  const {
+    products,
+    isLoading,
+    loadProducts,
+    getLowStockProducts,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    updateStock,
+    findProduct,
+  } = useProducts({ shopId: shop?.id });
   const { processText, lastResult } = useSmartNLP();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [voiceStatus, setVoiceStatus] = useState<string>('');
-  const [newProduct, setNewProduct] = useState({
-    name_en: '',
-    name_ml: '',
-    price: '',
-    unit: 'kg',
-    stock: '',
-    min_stock: '10',
-    gst_rate: '0',
-  });
 
-  // Handle voice commands for inventory
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [voiceStatus, setVoiceStatus] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+
+  // Voice command handler
   const handleVoiceResult = useCallback(
     async (transcript: string, isFinal: boolean) => {
       if (!isFinal) return;
-
       const result = await processText(transcript);
-
       switch (result.intent) {
-        case 'inventory.add':
+        case 'inventory.add': {
           const productName = result.entities.product;
           const quantity = result.entities.quantity || 10;
-
           if (productName) {
-            const existingProduct = findProduct(productName);
-            if (existingProduct) {
-              // Update existing product stock
-              await updateStock(existingProduct.id, existingProduct.stock + quantity);
-              voice.speak(`${existingProduct.name_ml} സ്റ്റോക്കിൽ ${quantity} ${existingProduct.unit} ചേർത്തു`);
-              setVoiceStatus(`Added ${quantity} ${existingProduct.unit} to ${existingProduct.name_en}`);
+            const existing = findProduct(productName);
+            if (existing) {
+              await updateStock(existing.id, existing.stock + quantity);
+              voice.speak(`${existing.name_ml} സ്റ്റോക്കിൽ ${quantity} ${existing.unit} ചേർത്തു`);
+              setVoiceStatus(`Added ${quantity} ${existing.unit} to ${existing.name_en}`);
             } else {
-              // Prompt to add new product
               voice.speak(`${productName} ലിസ്റ്റിൽ ഇല്ല. പുതിയ ഉൽപ്പന്നമായി ചേർക്കണോ?`);
-              setVoiceStatus(`Product "${productName}" not found. Say "add new product" to create.`);
+              setVoiceStatus(`Product "${productName}" not found.`);
             }
           } else {
             voice.speak('ഉൽപ്പന്നത്തിൻ്റെ പേര് പറയൂ');
           }
           break;
-
-        case 'inventory.check':
+        }
+        case 'inventory.check': {
           const checkProduct = result.entities.product;
           if (checkProduct) {
             const product = findProduct(checkProduct);
@@ -81,23 +92,21 @@ export default function InventoryPage() {
               voice.speak(`${checkProduct} കണ്ടെത്തിയില്ല`);
             }
           } else {
-            // Show all low stock
             const lowStock = getLowStockProducts();
             if (lowStock.length > 0) {
-              const names = lowStock.map(p => p.name_ml).join(', ');
+              const names = lowStock.map((p) => p.name_ml).join(', ');
               voice.speak(`${lowStock.length} ഉൽപ്പന്നങ്ങൾ സ്റ്റോക്ക് കുറവാണ്: ${names}`);
-              setVoiceStatus(`Low stock: ${lowStock.map(p => p.name_en).join(', ')}`);
+              setVoiceStatus(`Low stock: ${lowStock.map((p) => p.name_en).join(', ')}`);
             } else {
               voice.speak('എല്ലാ ഉൽപ്പന്നങ്ങളും സ്റ്റോക്കിൽ ഉണ്ട്');
               setVoiceStatus('All products in stock');
             }
           }
           break;
-
+        }
         case 'help':
           voice.speak('സ്റ്റോക്ക് ചേർക്കാൻ: "50 കിലോ അരി സ്റ്റോക്കിൽ ചേർക്കുക". സ്റ്റോക്ക് നോക്കാൻ: "അരി എത്ര ഉണ്ട്"');
           break;
-
         default:
           voice.speak('മനസ്സിലായില്ല. വീണ്ടും പറയൂ.');
       }
@@ -110,59 +119,92 @@ export default function InventoryPage() {
     onError: (error) => console.error('Voice error:', error),
   });
 
-  // Load products on mount
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
 
-  // Filter products
-  const filteredProducts = products.filter(
-    (p) =>
+  // Unique categories derived from products
+  const categories = [
+    'All',
+    ...Array.from(new Set(products.map((p) => p.category).filter(Boolean) as string[])),
+  ];
+
+  // Filtered products (search + category)
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch =
       p.name_en.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.name_ml.includes(searchQuery) ||
-      (p.aliases && p.aliases.some(a => a.toLowerCase().includes(searchQuery.toLowerCase())))
-  );
+      (p.aliases && p.aliases.some((a) => a.toLowerCase().includes(searchQuery.toLowerCase())));
+    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
-  // Low stock products
-  const lowStockProducts = getLowStockProducts();
+  const openAdd = () => {
+    setEditProduct(null);
+    setForm(EMPTY_FORM);
+    setDialogOpen(true);
+  };
 
-  // Handle add product
-  const handleAddProduct = async () => {
-    if (!newProduct.name_en || !newProduct.price) return;
-
-    await addProduct({
-      shop_id: shop?.id || 'demo-shop-id',
-      name_en: newProduct.name_en,
-      name_ml: newProduct.name_ml || newProduct.name_en,
-      price: parseFloat(newProduct.price),
-      cost_price: null,
-      stock: parseInt(newProduct.stock) || 0,
-      min_stock: parseInt(newProduct.min_stock) || 10,
-      unit: newProduct.unit,
-      gst_rate: parseFloat(newProduct.gst_rate) || 0,
-      category: null,
-      shelf_location: null,
-      barcode: null,
-      image_url: null,
-      is_active: true,
-      aliases: [newProduct.name_en.toLowerCase()],
+  const openEdit = (product: Product) => {
+    setEditProduct(product);
+    setForm({
+      name_en: product.name_en,
+      name_ml: product.name_ml,
+      price: String(product.price),
+      unit: product.unit,
+      stock: String(product.stock),
+      min_stock: String(product.min_stock),
+      gst_rate: String(product.gst_rate),
+      category: product.category || '',
     });
+    setDialogOpen(true);
+  };
 
-    setNewProduct({
-      name_en: '',
-      name_ml: '',
-      price: '',
-      unit: 'kg',
-      stock: '',
-      min_stock: '10',
-      gst_rate: '0',
-    });
-    setShowAddForm(false);
+  const handleSave = async () => {
+    if (!form.name_en || !form.price) return;
+    setSaving(true);
+    if (editProduct) {
+      await updateProduct(editProduct.id, {
+        name_en: form.name_en,
+        name_ml: form.name_ml || form.name_en,
+        price: parseFloat(form.price),
+        unit: form.unit,
+        stock: parseInt(form.stock) || 0,
+        min_stock: parseInt(form.min_stock) || 10,
+        gst_rate: parseFloat(form.gst_rate) || 0,
+        category: form.category || null,
+      });
+    } else {
+      await addProduct({
+        shop_id: shop?.id || 'demo-shop-id',
+        name_en: form.name_en,
+        name_ml: form.name_ml || form.name_en,
+        price: parseFloat(form.price),
+        cost_price: null,
+        stock: parseInt(form.stock) || 0,
+        min_stock: parseInt(form.min_stock) || 10,
+        unit: form.unit,
+        gst_rate: parseFloat(form.gst_rate) || 0,
+        category: form.category || null,
+        shelf_location: null,
+        barcode: null,
+        image_url: null,
+        is_active: true,
+        aliases: [form.name_en.toLowerCase()],
+      });
+    }
+    setSaving(false);
+    setDialogOpen(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this product?')) return;
+    await deleteProduct(id);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Voice Control Section */}
+    <div className="space-y-5">
+      {/* Voice Control */}
       <Card>
         <CardContent className="p-4 flex items-center gap-4">
           <VoiceButton
@@ -186,243 +228,230 @@ export default function InventoryPage() {
         </CardContent>
       </Card>
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Inventory</h2>
-          <p className="text-muted-foreground">
-            {products.length} products • {lowStockProducts.length} low stock
-          </p>
+      {/* Top bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex items-center gap-2 flex-1">
+          <h1 className="text-2xl font-bold">Inventory</h1>
+          <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+            {products.length}
+          </span>
         </div>
-        <Button onClick={() => setShowAddForm(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Product
-        </Button>
-      </div>
-
-      {/* Low stock alert */}
-      {lowStockProducts.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="flex items-center gap-4 p-4">
-            <AlertTriangle className="w-6 h-6 text-orange-500 shrink-0" />
-            <div className="flex-1">
-              <p className="font-medium">Low Stock Alert</p>
-              <p className="text-sm text-muted-foreground">
-                {lowStockProducts.map((p) => p.name_en).join(', ')} running low
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Search and filters */}
-      <div className="flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search products..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-9"
           />
         </div>
-        <div className="flex border rounded-md">
-          <Button
-            variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-            size="icon"
-            onClick={() => setViewMode('grid')}
-          >
-            <Grid className="w-4 h-4" />
-          </Button>
-          <Button
-            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-            size="icon"
-            onClick={() => setViewMode('list')}
-          >
-            <List className="w-4 h-4" />
-          </Button>
-        </div>
+        <Button onClick={openAdd}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Product
+        </Button>
       </div>
 
-      {/* Products grid/list */}
-      {viewMode === 'grid' ? (
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredProducts.map((product) => (
-            <Card
-              key={product.id}
-              className={
-                product.stock <= product.min_stock ? 'border-orange-300' : ''
-              }
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <Package className="w-5 h-5 text-primary" />
-                  </div>
-                  {product.stock <= product.min_stock && (
-                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">
-                      Low
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-semibold">{product.name_en}</h3>
-                <p className="text-sm text-muted-foreground mb-2">
-                  {product.name_ml}
-                </p>
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-lg font-bold text-primary">
-                      {formatCurrency(product.price)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      per {product.unit}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">
-                      {product.stock} {product.unit}
-                    </p>
-                    <p className="text-xs text-muted-foreground">in stock</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      {/* Category filter chips */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            className={cn(
+              'shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors',
+              selectedCategory === cat
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-background text-muted-foreground border-border hover:bg-muted'
+            )}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Loading skeleton */}
+      {isLoading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-muted rounded-2xl h-36 animate-pulse" />
           ))}
         </div>
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <table className="w-full">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="text-left p-4 font-medium">Product</th>
-                  <th className="text-right p-4 font-medium">Price</th>
-                  <th className="text-right p-4 font-medium">Stock</th>
-                  <th className="text-right p-4 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((product) => (
-                  <tr key={product.id} className="border-t">
-                    <td className="p-4">
-                      <p className="font-medium">{product.name_en}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {product.name_ml}
-                      </p>
-                    </td>
-                    <td className="p-4 text-right">
-                      {formatCurrency(product.price)}/{product.unit}
-                    </td>
-                    <td className="p-4 text-right">
-                      <span
-                        className={
-                          product.stock <= product.min_stock
-                            ? 'text-orange-600 font-medium'
-                            : ''
-                        }
-                      >
-                        {product.stock}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <Button variant="ghost" size="icon">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
       )}
 
-      {/* Add product modal placeholder */}
-      {showAddForm && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowAddForm(false)}
-        >
-          <Card
-            className="max-w-md w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardHeader>
-              <CardTitle>Add New Product</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Product Name (English)</label>
-                <Input
-                  placeholder="Rice"
-                  value={newProduct.name_en}
-                  onChange={(e) => setNewProduct((p) => ({ ...p, name_en: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Product Name (Malayalam)</label>
-                <Input
-                  placeholder="അരി"
-                  value={newProduct.name_ml}
-                  onChange={(e) => setNewProduct((p) => ({ ...p, name_ml: e.target.value }))}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Price (₹)</label>
-                  <Input
-                    type="number"
-                    placeholder="50"
-                    value={newProduct.price}
-                    onChange={(e) => setNewProduct((p) => ({ ...p, price: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Unit</label>
-                  <Input
-                    placeholder="kg"
-                    value={newProduct.unit}
-                    onChange={(e) => setNewProduct((p) => ({ ...p, unit: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Current Stock</label>
-                  <Input
-                    type="number"
-                    placeholder="100"
-                    value={newProduct.stock}
-                    onChange={(e) => setNewProduct((p) => ({ ...p, stock: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Min Stock Alert</label>
-                  <Input
-                    type="number"
-                    placeholder="10"
-                    value={newProduct.min_stock}
-                    onChange={(e) => setNewProduct((p) => ({ ...p, min_stock: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setShowAddForm(false)}
-                >
-                  Cancel
-                </Button>
-                <Button className="flex-1" onClick={handleAddProduct}>Save Product</Button>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Empty state */}
+      {!isLoading && filteredProducts.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <Package className="h-12 w-12 text-muted-foreground/40 mb-4" />
+          <p className="text-lg font-semibold text-muted-foreground">No products found</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {searchQuery || selectedCategory !== 'All'
+              ? 'Try adjusting your search or filter'
+              : 'Add your first product to get started'}
+          </p>
+          {!searchQuery && selectedCategory === 'All' && (
+            <Button className="mt-4" onClick={openAdd}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Product
+            </Button>
+          )}
         </div>
       )}
+
+      {/* Product grid */}
+      {!isLoading && filteredProducts.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredProducts.map((product) => (
+            <div
+              key={product.id}
+              className="bg-white rounded-2xl border border-border shadow-sm p-4 flex flex-col gap-3"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-semibold text-sm">{product.name_ml}</p>
+                  <p className="text-xs text-muted-foreground">{product.name_en}</p>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => openEdit(product)}
+                    className="p-1.5 hover:bg-muted rounded-lg transition-colors"
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(product.id)}
+                    className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-bold text-primary">₹{product.price}</span>
+                <span
+                  className={cn(
+                    'text-xs font-medium px-2 py-0.5 rounded-full',
+                    product.stock <= product.min_stock
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-green-100 text-green-700'
+                  )}
+                >
+                  {product.stock} {product.unit}
+                </span>
+              </div>
+              {product.category && (
+                <span className="text-xs text-muted-foreground">{product.category}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add / Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Name (English) *</label>
+                <Input
+                  placeholder="Rice"
+                  value={form.name_en}
+                  onChange={(e) => setForm((f) => ({ ...f, name_en: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Name (Malayalam)</label>
+                <Input
+                  placeholder="അരി"
+                  value={form.name_ml}
+                  onChange={(e) => setForm((f) => ({ ...f, name_ml: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Price (₹) *</label>
+                <Input
+                  type="number"
+                  placeholder="50"
+                  value={form.price}
+                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Unit</label>
+                <select
+                  value={form.unit}
+                  onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {UNITS.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Stock</label>
+                <Input
+                  type="number"
+                  placeholder="100"
+                  value={form.stock}
+                  onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Min Stock Alert</label>
+                <Input
+                  type="number"
+                  placeholder="10"
+                  value={form.min_stock}
+                  onChange={(e) => setForm((f) => ({ ...f, min_stock: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">GST Rate (%)</label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={form.gst_rate}
+                  onChange={(e) => setForm((f) => ({ ...f, gst_rate: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Category</label>
+                <Input
+                  placeholder="Groceries"
+                  value={form.category}
+                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={saving || !form.name_en || !form.price}
+            >
+              {saving ? 'Saving…' : editProduct ? 'Update Product' : 'Add Product'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

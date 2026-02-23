@@ -242,6 +242,61 @@ export function useProducts({ shopId }: UseProductsOptions = {}) {
     [isDemoMode, supabase]
   );
 
+  /**
+   * Update a product's fields
+   */
+  const updateProduct = useCallback(
+    async (productId: string, updates: Partial<Omit<Product, 'id' | 'created_at' | 'updated_at'>>) => {
+      const updatedAt = new Date().toISOString();
+      if (isDemoMode) {
+        setProducts((prev) =>
+          prev.map((p) => (p.id === productId ? { ...p, ...updates, updated_at: updatedAt } : p))
+        );
+        return { error: null };
+      }
+      try {
+        const { error: supabaseError } = await supabase!
+          .from('products')
+          .update({ ...updates, updated_at: updatedAt })
+          .eq('id', productId);
+        if (supabaseError) throw supabaseError;
+        setProducts((prev) =>
+          prev.map((p) => (p.id === productId ? { ...p, ...updates, updated_at: updatedAt } : p))
+        );
+        return { error: null };
+      } catch (err) {
+        console.error('Error updating product:', err);
+        return { error: err as Error };
+      }
+    },
+    [isDemoMode, supabase]
+  );
+
+  /**
+   * Delete a product
+   */
+  const deleteProduct = useCallback(
+    async (productId: string) => {
+      if (isDemoMode) {
+        setProducts((prev) => prev.filter((p) => p.id !== productId));
+        return { error: null };
+      }
+      try {
+        const { error: supabaseError } = await supabase!
+          .from('products')
+          .delete()
+          .eq('id', productId);
+        if (supabaseError) throw supabaseError;
+        setProducts((prev) => prev.filter((p) => p.id !== productId));
+        return { error: null };
+      } catch (err) {
+        console.error('Error deleting product:', err);
+        return { error: err as Error };
+      }
+    },
+    [isDemoMode, supabase]
+  );
+
   return {
     products,
     isLoading,
@@ -252,6 +307,8 @@ export function useProducts({ shopId }: UseProductsOptions = {}) {
     getAllProducts,
     getLowStockProducts,
     addProduct,
+    updateProduct,
+    deleteProduct,
     updateStock,
   };
 }

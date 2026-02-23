@@ -633,8 +633,8 @@ export default function VoiceHubPage() {
       {/* ── Header bar ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">{modeLabels[hubMode]}</h1>
-          <p className="text-xs text-gray-400">
+          <h1 className="text-xl font-bold">{modeLabels[hubMode]}</h1>
+          <p className="text-xs text-muted-foreground">
             {voice.state === 'listening'
               ? '🔴 കേൾക്കുന്നു...'
               : voice.state === 'processing'
@@ -653,7 +653,7 @@ export default function VoiceHubPage() {
               setConvState('idle');
               setStatusLine('ഞാൻ തയ്യാർ. സംസാരിക്കൂ.');
             }}
-            className="flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1.5 hover:bg-gray-200 transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground bg-muted rounded-full px-3 py-1.5 hover:bg-muted/80 transition-colors"
           >
             <X size={12} />
             ക്ലിയർ
@@ -663,14 +663,14 @@ export default function VoiceHubPage() {
 
       {/* ── Status / transcript bar ── */}
       {lastTranscript && (
-        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-2 text-sm text-blue-700">
-          <span className="text-blue-400 mr-2">🎤</span>
+        <div className="bg-white rounded-2xl border border-border shadow-sm px-4 py-2 text-sm">
+          <span className="text-muted-foreground mr-2">🎤</span>
           "{lastTranscript}"
         </div>
       )}
 
       {/* ── Dynamic display area ── */}
-      <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4">
+      <div className="flex-1 bg-white rounded-2xl border border-border shadow-sm overflow-hidden p-4">
         {hubMode === 'idle' && (
           <IdleView
             todaySales={todaySales}
@@ -719,7 +719,7 @@ export default function VoiceHubPage() {
 
       {/* ── Status line ── */}
       <div className="px-1">
-        <p className="text-sm text-gray-500 text-center min-h-[20px]">{statusLine}</p>
+        <p className="text-sm text-muted-foreground text-center min-h-[20px]">{statusLine}</p>
       </div>
 
       {/* ── Voice control bar ── */}
