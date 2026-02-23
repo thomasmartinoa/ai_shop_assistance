@@ -79,7 +79,7 @@ export async function detectIntent(text: string): Promise<DialogflowResponse | n
     const { data, error } = await callEdgeFunction('dialogflow-cx-detect', {
       text,
       sessionId: getSessionId(),
-      languageCode: 'ml',
+      languageCode: 'en',
     });
 
     if (error || !data) {
