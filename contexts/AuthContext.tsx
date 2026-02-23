@@ -57,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [shop, setShop] = useState<Shop | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [shopLoaded, setShopLoaded] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
 
   const supabase = createClient();
@@ -68,14 +69,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchShop = useCallback(async (userId: string) => {
     if (!supabase) return;
 
+    console.log('[Auth] fetchShop called for userId:', userId);
     const { data, error } = await supabase
       .from('shops')
       .select('*')
       .eq('owner_id', userId)
       .single();
 
+    console.log('[Auth] fetchShop result:', { data: data ? 'found' : 'null', error: error?.code, errorMsg: error?.message });
     if (error && error.code !== 'PGRST116') {
-      // PGRST116 = no rows returned (new user)
       console.error('Error fetching shop:', error);
     }
     setShop(data);
@@ -99,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  // Initialize auth state
+  // Initialize auth state — only set user/session, NOT shop
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
       console.log('[Auth] Supabase not configured, demo mode available');
@@ -109,29 +111,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     console.log('[Auth] Initializing auth...');
 
-    // Safety timeout — never spin forever
     const timeout = setTimeout(() => {
       console.warn('[Auth] Auth init timed out after 8s, forcing loaded state');
       setIsLoading(false);
     }, 8000);
 
-    // Use ONLY onAuthStateChange for initialization.
-    // It fires INITIAL_SESSION after processing URL hash (OAuth callback),
-    // avoiding the race condition where getSession() returns a stale session.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[Auth] onAuthStateChange:', event, session ? 'has session' : 'no session');
+      (event, session) => {
+        console.log('[Auth] onAuthStateChange:', event, session ? `has session (${session.user?.email})` : 'no session');
         setSession(session);
         setUser(session?.user ?? null);
-
-        try {
-          if (session?.user) {
-            await fetchShop(session.user.id);
-          } else {
-            setShop(null);
-          }
-        } catch (err) {
-          console.error('[Auth] fetchShop error:', err);
+        if (!session?.user) {
+          setShop(null);
         }
         clearTimeout(timeout);
         setIsLoading(false);
@@ -142,7 +133,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timeout);
       subscription.unsubscribe();
     };
-  }, [supabase, fetchShop, isSupabaseConfigured]);
+  }, [supabase, isSupabaseConfigured]);
+
+  // Fetch shop whenever user changes (decoupled from auth init)
+  useEffect(() => {
+    if (!user || isDemoMode) {
+      setShopLoaded(!user); // Mark loaded if no user (nothing to load)
+      return;
+    }
+    console.log('[Auth] User changed, fetching shop for:', user.email);
+    fetchShop(user.id).finally(() => setShopLoaded(true));
+  }, [user, isDemoMode, fetchShop]);
 
   // Sign in with Google OAuth
   const signInWithGoogle = async () => {
@@ -171,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setSession(null);
       setShop(null);
+      setShopLoaded(false);
       return;
     }
 
@@ -180,13 +182,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setShop(null);
+    setShopLoaded(false);
   };
 
   const value = {
     user,
     session,
     shop,
-    isLoading,
+    isLoading: isLoading || (!!user && !isDemoMode && !shopLoaded),
     isAuthenticated: !!user || isDemoMode,
     isDemoMode,
     signInWithGoogle,
