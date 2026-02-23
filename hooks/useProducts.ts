@@ -130,7 +130,7 @@ export function useProducts({ shopId }: UseProductsOptions = {}) {
         .from('products')
         .select('*')
         .eq('shop_id', shopId)
-        .order('name');
+        .order('name_en');
 
       if (supabaseError) throw supabaseError;
       setProducts(data || []);

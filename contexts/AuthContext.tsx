@@ -19,8 +19,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isDemoMode: boolean;
-  signInWithOtp: (phone: string) => Promise<{ error: Error | null }>;
-  verifyOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
+  signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshShop: () => Promise<void>;
   enableDemoMode: () => void;
@@ -147,63 +146,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [supabase, fetchShop, isSupabaseConfigured, enableDemoMode]);
 
-  // Sign in with phone OTP
-  const signInWithOtp = async (phone: string) => {
-    // DEV-ONLY: bypass Supabase/Twilio for test phone numbers
-    if (process.env.NODE_ENV === 'development') {
-      const testPhones = ['9443129400', '+919443129400', '9876543210', '+919876543210'];
-      const clean = phone.replace(/\D/g, '').slice(-10);
-      if (testPhones.some(t => t.replace(/\D/g, '').slice(-10) === clean)) {
-        sessionStorage.setItem('dev_test_phone', clean);
-        return { error: null };
-      }
-    }
-
+  // Sign in with Google OAuth
+  const signInWithGoogle = async () => {
     if (!isSupabaseConfigured || !supabase) {
-      return { error: null, isDemo: true };
+      enableDemoMode();
+      return { error: null };
     }
 
     try {
-      const formattedPhone = phone.startsWith('+91') ? phone : `+91${phone}`;
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
-      });
-      return { error: error ? new Error(error.message) : null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
-  // Verify OTP
-  const verifyOtp = async (phone: string, token: string) => {
-    // DEV-ONLY: accept test OTP for test phone numbers
-    if (process.env.NODE_ENV === 'development') {
-      const storedPhone = sessionStorage.getItem('dev_test_phone');
-      const clean = phone.replace(/\D/g, '').slice(-10);
-      if (storedPhone === clean) {
-        if (token === '121212') {
-          sessionStorage.removeItem('dev_test_phone');
-          enableDemoMode();
-          return { error: null };
-        }
-        return { error: new Error('Wrong test OTP — use 121212') };
-      }
-    }
-
-    if (!isSupabaseConfigured || !supabase) {
-      if (token === '123456') {
-        enableDemoMode();
-        return { error: null };
-      }
-      return { error: new Error('Demo OTP is 123456') };
-    }
-
-    try {
-      const formattedPhone = phone.startsWith('+91') ? phone : `+91${phone}`;
-      const { error } = await supabase.auth.verifyOtp({
-        phone: formattedPhone,
-        token,
-        type: 'sms',
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: typeof window !== 'undefined' ? window.location.origin + '/dashboard' : undefined,
+        },
       });
       return { error: error ? new Error(error.message) : null };
     } catch (error) {
@@ -236,8 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     isAuthenticated: !!user || isDemoMode,
     isDemoMode,
-    signInWithOtp,
-    verifyOtp,
+    signInWithGoogle,
     signOut,
     refreshShop,
     enableDemoMode,

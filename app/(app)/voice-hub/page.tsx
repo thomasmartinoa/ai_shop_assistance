@@ -296,12 +296,14 @@ export default function VoiceHubPage() {
       setHubMode('idle');
       setStatusLine('ഞാൻ തയ്യാർ. സംസാരിക്കൂ.');
       speak(SYSTEM.confirmed + ` ₹${total.toFixed(0)} ബിൽ ചെയ്തു.`);
+      // Refresh local product state so stock values are current
+      loadProducts();
     } catch (err) {
       showToast('Failed to save sale', 'error');
     } finally {
       setIsSaving(false);
     }
-  }, [cart, subtotal, gstAmount, total, shop?.id, isDemoMode, findProduct, showToast, speak]);
+  }, [cart, subtotal, gstAmount, total, shop?.id, isDemoMode, findProduct, showToast, speak, loadProducts]);
 
   // ─── Master voice result handler ───────────────────────────────────────────
   const handleVoiceResult = useCallback(async (transcript: string) => {
