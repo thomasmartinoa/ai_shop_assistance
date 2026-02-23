@@ -11,6 +11,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isLoading, isAuthenticated, shop, isDemoMode } = useAuth();
 
+  // Prefetch all app routes on mount for instant navigation
+  useEffect(() => {
+    if (!isAuthenticated || isLoading) return;
+    const routes = ['/dashboard', '/voice-hub', '/billing', '/inventory', '/reports', '/settings'];
+    routes.forEach((route) => router.prefetch(route));
+  }, [isAuthenticated, isLoading, router]);
+
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
