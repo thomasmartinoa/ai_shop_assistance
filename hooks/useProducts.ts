@@ -1,172 +1,31 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Product } from '@/types/database';
+import { KERALA_PRODUCTS } from '@/lib/data/products';
 
-// Demo products for testing without Supabase
-const DEMO_PRODUCTS: Product[] = [
-  {
-    id: 'demo-1',
-    shop_id: 'demo-shop-id',
-    name_en: 'Rice',
-    name_ml: 'അരി',
-    category: 'groceries',
-    price: 55,
-    cost_price: 50,
-    unit: 'kg',
-    stock: 100,
-    min_stock: 10,
-    gst_rate: 0,
-    aliases: ['ari', 'chawal', 'rice'],
-    shelf_location: 'A1',
-    barcode: null,
-    image_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'demo-2',
-    shop_id: 'demo-shop-id',
-    name_en: 'Sugar',
-    name_ml: 'പഞ്ചസാര',
-    category: 'groceries',
-    price: 45,
-    cost_price: 40,
-    unit: 'kg',
-    stock: 50,
-    min_stock: 5,
-    gst_rate: 5,
-    aliases: ['panchara', 'cheeni', 'sugar'],
-    shelf_location: 'A2',
-    barcode: null,
-    image_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'demo-3',
-    shop_id: 'demo-shop-id',
-    name_en: 'Coconut Oil',
-    name_ml: 'വെളിച്ചെണ്ണ',
-    category: 'oils',
-    price: 180,
-    cost_price: 160,
-    unit: 'litre',
-    stock: 30,
-    min_stock: 5,
-    gst_rate: 5,
-    aliases: ['velichenna', 'coconut oil', 'naalikera enna'],
-    shelf_location: 'B1',
-    barcode: null,
-    image_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'demo-4',
-    shop_id: 'demo-shop-id',
-    name_en: 'Tea Powder',
-    name_ml: 'ചായപ്പൊടി',
-    category: 'beverages',
-    price: 280,
-    cost_price: 250,
-    unit: 'kg',
-    stock: 20,
-    min_stock: 3,
-    gst_rate: 5,
-    aliases: ['chaya', 'tea', 'chai'],
-    shelf_location: 'C1',
-    barcode: null,
-    image_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'demo-5',
-    shop_id: 'demo-shop-id',
-    name_en: 'Milk',
-    name_ml: 'പാൽ',
-    category: 'dairy',
-    price: 55,
-    cost_price: 50,
-    unit: 'litre',
-    stock: 25,
-    min_stock: 10,
-    gst_rate: 0,
-    aliases: ['paal', 'milk', 'ksheeram'],
-    shelf_location: 'D1',
-    barcode: null,
-    image_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'demo-6',
-    shop_id: 'demo-shop-id',
-    name_en: 'Wheat Flour',
-    name_ml: 'ഗോതമ്പ് പൊടി',
-    category: 'groceries',
-    price: 42,
-    cost_price: 38,
-    unit: 'kg',
-    stock: 40,
-    min_stock: 10,
-    gst_rate: 0,
-    aliases: ['gothambu', 'atta', 'wheat', 'maida'],
-    shelf_location: 'A3',
-    barcode: null,
-    image_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'demo-7',
-    shop_id: 'demo-shop-id',
-    name_en: 'Salt',
-    name_ml: 'ഉപ്പ്',
-    category: 'groceries',
-    price: 20,
-    cost_price: 15,
-    unit: 'kg',
-    stock: 60,
-    min_stock: 10,
-    gst_rate: 0,
-    aliases: ['uppu', 'salt', 'namak'],
-    shelf_location: 'A4',
-    barcode: null,
-    image_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'demo-8',
-    shop_id: 'demo-shop-id',
-    name_en: 'Soap',
-    name_ml: 'സോപ്പ്',
-    category: 'personal-care',
-    price: 35,
-    cost_price: 28,
-    unit: 'piece',
-    stock: 100,
-    min_stock: 20,
-    gst_rate: 18,
-    aliases: ['soap', 'sabun', 'soppu'],
-    shelf_location: 'E1',
-    barcode: null,
-    image_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
+// Build demo products from the comprehensive Kerala product catalog
+const DEMO_PRODUCTS: Product[] = KERALA_PRODUCTS.map((p, index) => ({
+  id: `demo-${index + 1}`,
+  shop_id: 'demo-shop-id',
+  name_en: p.name_en,
+  name_ml: p.name_ml,
+  category: p.category,
+  price: p.price,
+  cost_price: p.cost_price,
+  unit: p.unit,
+  stock: Math.floor(Math.random() * 90) + 10,
+  min_stock: p.min_stock,
+  gst_rate: p.gst_rate,
+  aliases: p.aliases,
+  shelf_location: p.shelf_location,
+  barcode: null,
+  image_url: null,
+  is_active: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}));
 
 interface UseProductsOptions {
   shopId?: string;
@@ -247,9 +106,10 @@ function searchProduct(products: Product[], query: string): Product | null {
 }
 
 export function useProducts({ shopId }: UseProductsOptions = {}) {
-  const [products, setProducts] = useState<Product[]>(DEMO_PRODUCTS);
-  const [isLoading, setIsLoading] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const hasLoadedRef = useRef(false);
 
   const supabase = createClient();
   const isDemoMode = supabase === null;
@@ -259,10 +119,13 @@ export function useProducts({ shopId }: UseProductsOptions = {}) {
    */
   const loadProducts = useCallback(async () => {
     if (isDemoMode || !shopId) {
+      console.log('[Products] Using demo products (isDemoMode:', isDemoMode, ', shopId:', shopId, ')');
       setProducts(DEMO_PRODUCTS);
+      setIsLoading(false);
       return;
     }
 
+    console.log('[Products] Loading from Supabase for shop:', shopId);
     setIsLoading(true);
     setError(null);
 
@@ -271,18 +134,25 @@ export function useProducts({ shopId }: UseProductsOptions = {}) {
         .from('products')
         .select('*')
         .eq('shop_id', shopId)
-        .order('name');
+        .order('name_en');
 
       if (supabaseError) throw supabaseError;
+      console.log('[Products] Loaded', data?.length ?? 0, 'products from Supabase');
       setProducts(data || []);
     } catch (err) {
-      console.error('Error loading products:', err);
+      console.error('[Products] Error loading products:', err);
       setError(err as Error);
-      setProducts(DEMO_PRODUCTS); // Fallback to demo
+      setProducts(DEMO_PRODUCTS);
     } finally {
       setIsLoading(false);
     }
   }, [isDemoMode, shopId, supabase]);
+
+  // Auto-load products when shopId changes
+  useEffect(() => {
+    loadProducts();
+    hasLoadedRef.current = true;
+  }, [loadProducts]);
 
   /**
    * Search for a product by name/alias
@@ -383,6 +253,61 @@ export function useProducts({ shopId }: UseProductsOptions = {}) {
     [isDemoMode, supabase]
   );
 
+  /**
+   * Update a product's fields
+   */
+  const updateProduct = useCallback(
+    async (productId: string, updates: Partial<Omit<Product, 'id' | 'created_at' | 'updated_at'>>) => {
+      const updatedAt = new Date().toISOString();
+      if (isDemoMode) {
+        setProducts((prev) =>
+          prev.map((p) => (p.id === productId ? { ...p, ...updates, updated_at: updatedAt } : p))
+        );
+        return { error: null };
+      }
+      try {
+        const { error: supabaseError } = await supabase!
+          .from('products')
+          .update({ ...updates, updated_at: updatedAt })
+          .eq('id', productId);
+        if (supabaseError) throw supabaseError;
+        setProducts((prev) =>
+          prev.map((p) => (p.id === productId ? { ...p, ...updates, updated_at: updatedAt } : p))
+        );
+        return { error: null };
+      } catch (err) {
+        console.error('Error updating product:', err);
+        return { error: err as Error };
+      }
+    },
+    [isDemoMode, supabase]
+  );
+
+  /**
+   * Delete a product
+   */
+  const deleteProduct = useCallback(
+    async (productId: string) => {
+      if (isDemoMode) {
+        setProducts((prev) => prev.filter((p) => p.id !== productId));
+        return { error: null };
+      }
+      try {
+        const { error: supabaseError } = await supabase!
+          .from('products')
+          .delete()
+          .eq('id', productId);
+        if (supabaseError) throw supabaseError;
+        setProducts((prev) => prev.filter((p) => p.id !== productId));
+        return { error: null };
+      } catch (err) {
+        console.error('Error deleting product:', err);
+        return { error: err as Error };
+      }
+    },
+    [isDemoMode, supabase]
+  );
+
   return {
     products,
     isLoading,
@@ -393,6 +318,8 @@ export function useProducts({ shopId }: UseProductsOptions = {}) {
     getAllProducts,
     getLowStockProducts,
     addProduct,
+    updateProduct,
+    deleteProduct,
     updateStock,
   };
 }

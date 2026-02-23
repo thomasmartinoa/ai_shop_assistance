@@ -19,8 +19,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isDemoMode: boolean;
-  signInWithOtp: (phone: string) => Promise<{ error: Error | null }>;
-  verifyOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
+  signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshShop: () => Promise<void>;
   enableDemoMode: () => void;
@@ -58,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [shop, setShop] = useState<Shop | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [shopLoaded, setShopLoaded] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
 
   const supabase = createClient();
@@ -68,15 +68,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch shop data for the current user
   const fetchShop = useCallback(async (userId: string) => {
     if (!supabase) return;
-    
+
+    console.log('[Auth] fetchShop called for userId:', userId);
     const { data, error } = await supabase
       .from('shops')
       .select('*')
       .eq('owner_id', userId)
       .single();
 
+    console.log('[Auth] fetchShop result:', { data: data ? 'found' : 'null', error: error?.code, errorMsg: error?.message });
     if (error && error.code !== 'PGRST116') {
-      // PGRST116 = no rows returned (new user)
       console.error('Error fetching shop:', error);
     }
     setShop(data);
@@ -100,95 +101,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  // Initialize auth state
+  // Initialize auth state — only set user/session, NOT shop
   useEffect(() => {
-    const initAuth = async () => {
-      // If Supabase is not configured, just stop loading
-      // Don't auto-enable demo mode - let user click "Get Started" first
-      if (!isSupabaseConfigured) {
-        console.log('Supabase not configured, demo mode available');
-        setIsLoading(false);
-        return;
-      }
+    if (!isSupabaseConfigured || !supabase) {
+      console.log('[Auth] Supabase not configured, demo mode available');
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        const { data: { session } } = await supabase!.auth.getSession();
+    console.log('[Auth] Initializing auth...');
+
+    const timeout = setTimeout(() => {
+      console.warn('[Auth] Auth init timed out after 8s, forcing loaded state');
+      setIsLoading(false);
+    }, 8000);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log('[Auth] onAuthStateChange:', event, session ? `has session (${session.user?.email})` : 'no session');
         setSession(session);
         setUser(session?.user ?? null);
-
-        if (session?.user) {
-          await fetchShop(session.user.id);
+        if (!session?.user) {
+          setShop(null);
         }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
+        clearTimeout(timeout);
         setIsLoading(false);
       }
+    );
+
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
     };
+  }, [supabase, isSupabaseConfigured]);
 
-    initAuth();
-
-    // Listen for auth changes only if Supabase is configured
-    if (isSupabaseConfigured && supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          setSession(session);
-          setUser(session?.user ?? null);
-
-          if (session?.user) {
-            await fetchShop(session.user.id);
-          } else {
-            setShop(null);
-          }
-        }
-      );
-
-      return () => subscription.unsubscribe();
+  // Fetch shop whenever user changes (decoupled from auth init)
+  useEffect(() => {
+    if (!user || isDemoMode) {
+      setShopLoaded(!user); // Mark loaded if no user (nothing to load)
+      return;
     }
-  }, [supabase, fetchShop, isSupabaseConfigured, enableDemoMode]);
+    console.log('[Auth] User changed, fetching shop for:', user.email);
+    fetchShop(user.id).finally(() => setShopLoaded(true));
+  }, [user, isDemoMode, fetchShop]);
 
-  // Sign in with phone OTP
-  const signInWithOtp = async (phone: string) => {
+  // Sign in with Google OAuth
+  const signInWithGoogle = async () => {
     if (!isSupabaseConfigured || !supabase) {
-      // In demo mode, proceed to OTP step (don't auto-login yet)
-      // This allows user to see the OTP verification flow
-      return { error: null, isDemo: true };
+      enableDemoMode();
+      return { error: null };
     }
 
     try {
-      // Format phone number for India
-      const formattedPhone = phone.startsWith('+91') ? phone : `+91${phone}`;
-      
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: typeof window !== 'undefined' ? window.location.origin + '/dashboard' : undefined,
+        },
       });
-
-      return { error: error ? new Error(error.message) : null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
-  // Verify OTP
-  const verifyOtp = async (phone: string, token: string) => {
-    if (!isSupabaseConfigured || !supabase) {
-      // In demo mode, accept demo OTP
-      if (token === '123456') {
-        enableDemoMode();
-        return { error: null };
-      }
-      return { error: new Error('Demo OTP is 123456') };
-    }
-
-    try {
-      const formattedPhone = phone.startsWith('+91') ? phone : `+91${phone}`;
-      
-      const { error } = await supabase.auth.verifyOtp({
-        phone: formattedPhone,
-        token,
-        type: 'sms',
-      });
-
       return { error: error ? new Error(error.message) : null };
     } catch (error) {
       return { error: error as Error };
@@ -202,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setSession(null);
       setShop(null);
+      setShopLoaded(false);
       return;
     }
 
@@ -211,17 +182,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setShop(null);
+    setShopLoaded(false);
   };
 
   const value = {
     user,
     session,
     shop,
-    isLoading,
+    isLoading: isLoading || (!!user && !isDemoMode && !shopLoaded),
     isAuthenticated: !!user || isDemoMode,
     isDemoMode,
-    signInWithOtp,
-    verifyOtp,
+    signInWithGoogle,
     signOut,
     refreshShop,
     enableDemoMode,
