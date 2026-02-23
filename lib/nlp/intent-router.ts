@@ -6,7 +6,7 @@
  * that the Voice Hub page can render and speak.
  */
 
-import type { NLPResult, DialogflowIntentType } from '@/lib/nlp/useSmartNLP';
+import type { NLPResult, DialogflowIntentType, CXProduct } from '@/lib/nlp/useSmartNLP';
 import { BILLING, STOCK, INVENTORY, REPORTS, SYSTEM, PAYMENT } from '@/lib/voice/responses-ml';
 
 // ─── Hub Modes (what is currently displayed) ─────────────────────────────────
@@ -54,44 +54,33 @@ export interface RouterAction {
 // ─── Dialogflow intent → operation mapping ───────────────────────────────────
 
 const INTENT_TO_OPERATION: Record<string, RouterAction['operation']> = {
+  // CX Playbook intent names (primary)
   'billing.add': 'add_to_cart',
   'billing.remove': 'remove_from_cart',
   'billing.clear': 'clear_cart',
   'billing.total': 'show_total',
   'billing.complete': 'show_total',
-  'payment.upi': 'show_qr',
-  'payment.cash': 'complete_payment',
-  'inventory.check': 'check_stock',
+  'stock.check': 'check_stock',
+  'stock.location': 'find_location',
   'inventory.add': 'add_stock',
   'inventory.update': 'update_price',
+  'inventory.check': 'check_stock',
+  'inventory.low_stock': 'check_low_stock',
+  'payment.upi': 'show_qr',
+  'payment.cash': 'complete_payment',
   'report.today': 'report_today',
   'report.week': 'report_week',
+  'confirm': 'confirm',
+  'cancel': 'cancel',
+  'help': 'help',
+  'greeting': 'none',
+  'fallback': 'none',
+  // Legacy ES intent names (backward compat)
   'general.confirm': 'confirm',
   'general.cancel': 'cancel',
   'general.help': 'help',
-  'general.addmore': 'add_to_cart',
   'general.greeting': 'none',
-  'fallback': 'none',
-  // New intent types from INTENT_TYPES constant
-  'BILLING_ADD': 'add_to_cart',
-  'BILLING_REMOVE': 'remove_from_cart',
-  'BILLING_CLEAR': 'clear_cart',
-  'STOCK_CHECK': 'check_stock',
-  'LOCATION_FIND': 'find_location',
-  'BILL_TOTAL': 'show_total',
-  'PAYMENT_UPI': 'show_qr',
-  'PAYMENT_CASH': 'complete_payment',
-  'CONFIRM': 'confirm',
-  'CANCEL': 'cancel',
-  'HELP': 'help',
-  'INVENTORY_ADD': 'add_stock',
-  'INVENTORY_UPDATE': 'update_price',
-  'INVENTORY_CHECK': 'check_low_stock',
-  'REPORTS_TODAY': 'report_today',
-  'REPORTS_WEEK': 'report_week',
-  'REPORTS_PRODUCT': 'report_product',
-  'REPORTS_PROFIT': 'report_profit',
-  'UNKNOWN': 'none',
+  'general.addmore': 'add_to_cart',
 };
 
 // ─── Mode determination ───────────────────────────────────────────────────────
@@ -200,32 +189,20 @@ export function routeIntent(nlpResult: NLPResult): RouterAction {
  * Check if an NLP result is a "billing add" type intent
  */
 export function isBillingAdd(nlpResult: NLPResult): boolean {
-  const intentStr = String(nlpResult.intent);
-  return intentStr === 'billing.add' || intentStr === 'BILLING_ADD';
+  return String(nlpResult.intent) === 'billing.add';
 }
 
-/**
- * Check if an NLP result is a confirmation
- */
 export function isConfirm(nlpResult: NLPResult): boolean {
-  const intentStr = String(nlpResult.intent);
-  return intentStr === 'general.confirm' || intentStr === 'CONFIRM';
+  const i = String(nlpResult.intent);
+  return i === 'confirm' || i === 'general.confirm';
 }
 
-/**
- * Check if an NLP result is a cancellation
- */
 export function isCancel(nlpResult: NLPResult): boolean {
-  const intentStr = String(nlpResult.intent);
-  return intentStr === 'general.cancel' || intentStr === 'CANCEL';
+  const i = String(nlpResult.intent);
+  return i === 'cancel' || i === 'general.cancel';
 }
 
-/**
- * Check if an NLP result is "add more" / wants to continue
- */
 export function isAddMore(nlpResult: NLPResult): boolean {
-  const intentStr = String(nlpResult.intent);
-  return intentStr === 'general.addmore' ||
-    intentStr === 'CONFIRM' ||
-    intentStr === 'general.confirm';
+  const i = String(nlpResult.intent);
+  return i === 'confirm' || i === 'general.confirm' || i === 'general.addmore';
 }

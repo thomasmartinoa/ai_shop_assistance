@@ -160,19 +160,16 @@ export default function BillingPage() {
         console.log('📱 Billing: In awaiting_confirmation state');
         // User wants to add more items
         if (result.intent === 'billing.add' ||
-          result.intent === 'general.addmore' ||
           /കൂടി|more|വേറെ|add|ചേർക്കുക|ഇനി|വേണം|ഉണ്ട്/i.test(transcript)) {
           console.log('📱 Billing: User wants to add more items');
           setConversationState('idle');
-          // If they said something like "വേറെ ഉണ്ട്" or "ഇനിയും വേണം" without product, just wait
           if (result.intent !== 'billing.add') {
             voice.speak('ശരി, എന്താണ് വേണ്ടത്?');
             return;
           }
-          // Fall through to handle billing.add below
         }
         // User confirms billing (yes/done/bill it/no more)
-        else if (result.intent === 'general.confirm' ||
+        else if (result.intent === 'confirm' ||
           result.intent === 'billing.complete' ||
           result.intent === 'billing.total' ||
           /ശരി|ഇല്ല|മതി|അത്രതന്നെ|bill|ബിൽ|done|കഴിഞ്ഞു|no more|അത്ര|that's all|proceed/i.test(transcript)) {
@@ -183,7 +180,7 @@ export default function BillingPage() {
           return;
         }
         // User wants to cancel
-        else if (result.intent === 'general.cancel' || /cancel|റദ്ദാക്കുക|വേണ്ട/i.test(transcript)) {
+        else if (result.intent === 'cancel' || /cancel|റദ്ദാക്കുക|വേണ്ട/i.test(transcript)) {
           console.log('📱 Billing: User cancelled');
           setConversationState('idle');
           voice.speak('ശരി, ഇനിയും ഉൽപ്പന്നങ്ങൾ ചേർക്കാം');
@@ -299,7 +296,7 @@ export default function BillingPage() {
           }
           break;
 
-        case 'general.confirm':
+        case 'confirm':
           if (conversationState === 'idle' && cart.length > 0) {
             setConversationState('processing_payment');
             voice.speak(`ആകെ ${Math.round(total)} രൂപ. UPI അല്ലെങ്കിൽ കാഷ്?`);
@@ -308,16 +305,16 @@ export default function BillingPage() {
           }
           break;
 
-        case 'general.cancel':
+        case 'cancel':
           setConversationState('idle');
           voice.speak('റദ്ദാക്കി');
           break;
 
-        case 'general.greeting':
+        case 'greeting':
           voice.speak('നമസ്കാരം! എന്ത് സഹായം വേണം?');
           break;
 
-        case 'general.help':
+        case 'help':
           voice.speak('നിങ്ങൾക്ക് ഉൽപ്പന്നങ്ങൾ ബില്ലിൽ ചേർക്കാം. ഉദാഹരണം: രണ്ട് കിലോ അരി');
           break;
 

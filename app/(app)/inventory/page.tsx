@@ -94,7 +94,7 @@ export default function InventoryPage() {
           }
           break;
 
-        case 'general.help':
+        case 'help':
           voice.speak('സ്റ്റോക്ക് ചേർക്കാൻ: "50 കിലോ അരി സ്റ്റോക്കിൽ ചേർക്കുക". സ്റ്റോക്ക് നോക്കാൻ: "അരി എത്ര ഉണ്ട്"');
           break;
 

@@ -10,11 +10,10 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useVoice } from '@/hooks/useVoice';
 import { useProducts } from '@/hooks/useProducts';
-import { useSmartNLP } from '@/lib/nlp/useSmartNLP';
+import { useSmartNLP, type CXProduct } from '@/lib/nlp/useSmartNLP';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/shared/Toast';
 import { routeIntent, isConfirm, isCancel, type RouterAction, type HubMode } from '@/lib/nlp/intent-router';
-import { parseMultipleItems, looksLikeMultipleItems, type ParsedItem } from '@/lib/nlp/multi-item-parser';
 import { BILLING, SYSTEM, STOCK, INVENTORY, REPORTS } from '@/lib/voice/responses-ml';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
@@ -117,23 +116,22 @@ export default function VoiceHubPage() {
     fetchToday();
   }, [shop?.id]);
 
-  // ─── Add parsed items to cart ──────────────────────────────────────────────
-  const addItemsToCart = useCallback((items: ParsedItem[]) => {
+  // ─── Add CX products to cart ──────────────────────────────────────────────
+  const addItemsToCart = useCallback((items: CXProduct[]) => {
     const added: CartItem[] = [];
 
     for (const item of items) {
-      const product = findProduct(item.productName);
+      const product = findProduct(item.name) || findProduct(item.nameMl);
       const price = product?.price ?? 0;
       const gstRate = product?.gst_rate ?? 0;
       const unit = item.unit !== 'piece' ? item.unit : (product?.unit ?? 'piece');
 
       if (!product && price === 0) {
-        // Unknown product — still add with 0 price so user sees it
         added.push({
-          id: `${item.productName}-${Date.now()}`,
-          name: item.productName,
-          nameMl: item.productMl || item.productName,
-          quantity: item.quantity,
+          id: `${item.name}-${Date.now()}`,
+          name: item.name,
+          nameMl: item.nameMl || item.name,
+          quantity: item.qty,
           unit,
           price: 0,
           gstRate: 0,
@@ -142,15 +140,13 @@ export default function VoiceHubPage() {
         continue;
       }
 
-      // Check if same product already in cart
       const existingIdx = cart.findIndex(
-        (c) => c.name.toLowerCase() === item.productName.toLowerCase()
+        (c) => c.name.toLowerCase() === item.name.toLowerCase()
       );
 
       if (existingIdx !== -1) {
-        // Merge quantities
         const existing = cart[existingIdx];
-        const newQty = existing.quantity + item.quantity;
+        const newQty = existing.quantity + item.qty;
         added.push({
           ...existing,
           quantity: newQty,
@@ -158,14 +154,14 @@ export default function VoiceHubPage() {
         });
       } else {
         added.push({
-          id: `${item.productName}-${Date.now()}`,
-          name: item.productName,
-          nameMl: item.productMl || (product?.name_ml ?? item.productName),
-          quantity: item.quantity,
+          id: `${item.name}-${Date.now()}`,
+          name: item.name,
+          nameMl: item.nameMl || (product?.name_ml ?? item.name),
+          quantity: item.qty,
           unit,
           price,
           gstRate,
-          total: item.quantity * price,
+          total: item.qty * price,
         });
       }
     }
@@ -177,7 +173,7 @@ export default function VoiceHubPage() {
       for (const newItem of added) {
         const existIdx = next.findIndex((c) => c.name === newItem.name);
         if (existIdx !== -1) {
-          next[existIdx] = newItem; // replace with merged
+          next[existIdx] = newItem;
         } else {
           next.push(newItem);
         }
@@ -313,51 +309,45 @@ export default function VoiceHubPage() {
     setLastTranscript(transcript);
     setStatusLine('മനസ്സിലാക്കുന്നു...');
 
-    // ── 1. Check for multi-item billing command ─────────────────────────────
-    if (looksLikeMultipleItems(transcript) || convState === 'idle' || convState === 'billing_active' || convState === 'asked_more') {
-      const parsedItems = parseMultipleItems(transcript);
-
-      if (parsedItems.length > 0 && (parsedItems.length > 1 || convState === 'billing_active' || convState === 'asked_more')) {
-        const added = addItemsToCart(parsedItems);
-        if (added && added.length > 0) {
-          const namesMl = parsedItems.map((p) => p.productMl || p.productName);
-          const response =
-            parsedItems.length === 1
-              ? BILLING.item_added(parsedItems[0].quantity, parsedItems[0].unit, parsedItems[0].productMl || parsedItems[0].productName)
-              : BILLING.items_added(namesMl);
-
-          setHubMode('billing');
-          setConvState('billing_active');
-          setLastAddedLabel(response);
-          setStatusLine(response);
-          speak(response);
-          return;
-        }
-      }
-    }
-
-    // ── 2. NLP routing ─────────────────────────────────────────────────────
+    // ── 1. Send to CX Playbook for understanding ────────────────────────────
     const nlpResult = await processText(transcript);
     const action = routeIntent(nlpResult);
 
-    // ── 3. Handle based on operation ───────────────────────────────────────
+    // Use CX Malayalam response if available, otherwise our generated one
+    const cxResponse = nlpResult.fulfillmentText || action.voiceResponse;
+
+    // ── 2. Handle based on operation ───────────────────────────────────────
     switch (action.operation) {
       // ── Billing ──
       case 'add_to_cart': {
-        const singleItem = parseMultipleItems(transcript);
-        if (singleItem.length > 0) {
-          const added = addItemsToCart(singleItem);
+        // CX returns products[] array — use it directly
+        const products = nlpResult.products || [];
+        if (products.length > 0) {
+          const added = addItemsToCart(products);
           if (added && added.length > 0) {
-            const res = BILLING.item_added(
-              singleItem[0].quantity,
-              singleItem[0].unit,
-              singleItem[0].productMl || singleItem[0].productName
-            );
             setHubMode('billing');
             setConvState('billing_active');
-            setLastAddedLabel(res);
-            setStatusLine(res);
-            speak(res);
+            setLastAddedLabel(cxResponse);
+            setStatusLine(cxResponse);
+            speak(cxResponse);
+            return;
+          }
+        }
+        // CX said billing.add but no products extracted — try entity fallback
+        if (nlpResult.entities.product) {
+          const fallbackProduct: CXProduct = {
+            name: nlpResult.entities.product,
+            nameMl: nlpResult.entities.productMl || nlpResult.entities.product,
+            qty: nlpResult.entities.quantity || 1,
+            unit: nlpResult.entities.unit || 'kg',
+          };
+          const added = addItemsToCart([fallbackProduct]);
+          if (added && added.length > 0) {
+            setHubMode('billing');
+            setConvState('billing_active');
+            setLastAddedLabel(cxResponse);
+            setStatusLine(cxResponse);
+            speak(cxResponse);
             return;
           }
         }
@@ -583,27 +573,9 @@ export default function VoiceHubPage() {
 
       // ── Fallback ──
       default: {
-        // Maybe it's a single-item billing (e.g. "rice 2kg")
-        const singleParsed = parseMultipleItems(transcript);
-        if (singleParsed.length > 0 && singleParsed[0].confidence >= 0.5) {
-          const added = addItemsToCart(singleParsed);
-          if (added && added.length > 0) {
-            const res = BILLING.item_added(
-              singleParsed[0].quantity,
-              singleParsed[0].unit,
-              singleParsed[0].productMl || singleParsed[0].productName
-            );
-            setHubMode('billing');
-            setConvState('billing_active');
-            setLastAddedLabel(res);
-            setStatusLine(res);
-            speak(res);
-            return;
-          }
-        }
-
-        setStatusLine(SYSTEM.not_understood);
-        speak(SYSTEM.not_understood);
+        // CX returned fallback — speak the CX response or our default
+        setStatusLine(cxResponse || SYSTEM.not_understood);
+        speak(cxResponse || SYSTEM.not_understood);
         break;
       }
     }
