@@ -122,6 +122,17 @@ export default function OnboardingPage() {
     );
   }
 
+  // DEBUG: show auth state to diagnose redirect issue
+  if (typeof window !== 'undefined') {
+    console.log('[Onboarding] Rendered with:', {
+      userId: user?.id,
+      email: user?.email,
+      shopId: shop?.id,
+      isAuthenticated,
+      isLoading,
+    });
+  }
+
   if (!isAuthenticated || shop) return null;
 
   const completedSteps = Array.from({ length: step }, (_, i) => i);
