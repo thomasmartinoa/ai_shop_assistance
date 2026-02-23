@@ -19,8 +19,14 @@ export interface TopProduct {
 export interface Transaction {
     id: string;
     created_at: string;
+    subtotal: number;
+    gst_amount: number;
+    discount: number;
     total: number;
     payment_method: string;
+    payment_status: string;
+    customer_phone: string | null;
+    notes: string | null;
     items: Array<{
         product_name?: string;
         name?: string;
@@ -97,7 +103,7 @@ export function useTransactions(shopId?: string, period?: Period): UseTransactio
             try {
                 let query = supabase!
                     .from('transactions')
-                    .select('id, created_at, total, items, payment_method')
+                    .select('id, created_at, subtotal, gst_amount, discount, total, items, payment_method, payment_status, customer_phone, notes')
                     .eq('shop_id', resolvedShopId!)
                     .eq('payment_status', 'completed')
                     .order('created_at', { ascending: false });

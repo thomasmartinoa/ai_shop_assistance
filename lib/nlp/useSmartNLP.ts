@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import {
   detectIntent,
   isDialogflowConfigured,
@@ -53,7 +53,6 @@ export function useSmartNLP() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResult, setLastResult] = useState<NLPResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const cxAvailable = useRef<boolean | null>(null);
 
   const processText = useCallback(async (text: string): Promise<NLPResult> => {
     if (!text.trim()) {
@@ -66,11 +65,10 @@ export function useSmartNLP() {
 
     try {
       // Try CX Playbook
-      if (isDialogflowConfigured() && cxAvailable.current !== false) {
+      if (isDialogflowConfigured()) {
         const cxResult = await detectIntent(text);
 
         if (cxResult) {
-          cxAvailable.current = true;
           const result: NLPResult = {
             intent: cxResult.intent,
             confidence: cxResult.confidence,
@@ -84,8 +82,7 @@ export function useSmartNLP() {
           setIsProcessing(false);
           return result;
         } else {
-          console.warn('🧠 CX NLP: CX unavailable, using local fallback');
-          cxAvailable.current = false;
+          console.warn('🧠 CX NLP: CX call failed, using local fallback for this request');
         }
       }
 
@@ -118,10 +115,8 @@ export function useSmartNLP() {
     if (!isDialogflowConfigured()) return false;
     try {
       const result = await detectIntent('ഹലോ');
-      cxAvailable.current = !!result;
       return !!result;
     } catch {
-      cxAvailable.current = false;
       return false;
     }
   }, []);

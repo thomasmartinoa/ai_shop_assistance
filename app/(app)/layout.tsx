@@ -1,37 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sidebar } from '@/components/shared/Sidebar';
-import { Header } from '@/components/shared/Header';
-import { BottomTabs } from '@/components/shared/BottomTabs';
-import { FloatingMic } from '@/components/shared/FloatingMic';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { BottomTabs } from '@/components/layout/BottomTabs';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, isDemoMode, shop } = useAuth();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isLoading, isAuthenticated, shop, isDemoMode } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login');
+    if (isLoading) return;
+    if (!isAuthenticated) {
+      router.replace('/login');
+      return;
     }
-  }, [isAuthenticated, isLoading, router]);
-
-  useEffect(() => {
-    if (!isLoading && isAuthenticated && !isDemoMode && !shop) {
-      router.push('/onboarding');
+    if (!shop && !isDemoMode) {
+      router.replace('/onboarding');
     }
-  }, [isAuthenticated, isLoading, isDemoMode, shop, router]);
+  }, [isLoading, isAuthenticated, shop, isDemoMode, router]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30">
-        <div className="text-center">
-          <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-page">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-orange-500 border-t-transparent" />
       </div>
     );
   }
@@ -39,16 +33,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="lg:pl-64">
-        <Header onMenuToggle={() => setSidebarOpen(true)} />
-        <main className="p-4 lg:p-6 pb-24 lg:pb-8">
+    <div className="flex h-screen">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-h-screen lg:ml-0">
+        <AppHeader />
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 bg-page pb-20 lg:pb-6">
           {children}
         </main>
+        <BottomTabs />
       </div>
-      <BottomTabs />
-      <FloatingMic />
     </div>
   );
 }
