@@ -108,7 +108,7 @@ export default function InventoryPage() {
   }, [deleteProduct]);
 
   const handleSave = useCallback(async () => {
-    if (!form.name_en.trim() || !form.name_ml.trim() || !form.price) {
+    if (!form.name_en.trim() || !form.price) {
       toast.error('Please fill in required fields');
       return;
     }
@@ -116,7 +116,7 @@ export default function InventoryPage() {
     try {
       const payload = {
         name_en: form.name_en.trim(),
-        name_ml: form.name_ml.trim(),
+        name_ml: form.name_ml.trim() || form.name_en.trim(),
         price: parseFloat(form.price) || 0,
         cost_price: form.cost_price ? parseFloat(form.cost_price) : null,
         stock: parseInt(form.stock) || 0,
