@@ -2,192 +2,132 @@
 
 import { callEdgeFunction, isEdgeFunctionsAvailable } from '@/lib/supabase/edge-functions';
 
-// Intent types that Dialogflow will detect
+// Intent types that CX Playbook returns
 export type DialogflowIntentType =
-  | 'billing.add'           // Add item to bill: "അരി രണ്ട് കിലോ"
-  | 'billing.remove'        // Remove item: "അരി മാറ്റുക"
-  | 'billing.clear'         // Clear bill: "ബിൽ ക്ലിയർ"
-  | 'billing.total'         // Get total: "ടോട്ടൽ എത്ര"
-  | 'billing.complete'      // Complete transaction: "ബിൽ ചെയ്യൂ", "അത്രതന്നെ"
-  | 'inventory.add'         // Add to inventory: "സ്റ്റോക്കിൽ 50 കിലോ അരി ചേർക്കുക"
-  | 'inventory.check'       // Check stock: "അരി എത്ര ഉണ്ട്"
-  | 'inventory.update'      // Update stock
-  | 'payment.upi'           // UPI payment: "QR കാണിക്കുക"
-  | 'payment.cash'          // Cash payment: "കാഷ്"
-  | 'report.today'          // Today's sales
-  | 'report.week'           // Weekly report
-  | 'navigation.billing'    // Go to billing
-  | 'navigation.inventory'  // Go to inventory
-  | 'general.help'          // Help request
-  | 'general.greeting'      // Greeting
-  | 'general.cancel'        // Cancel action
-  | 'general.confirm'       // Confirm action: "ശരി", "yes"
-  | 'general.addmore'       // Add more items: "ഇനിയും വേണം", "കൂടി"
-  | 'fallback';             // Unknown intent
+  | 'billing.add'
+  | 'billing.remove'
+  | 'billing.clear'
+  | 'billing.total'
+  | 'billing.complete'
+  | 'stock.check'
+  | 'stock.location'
+  | 'inventory.add'
+  | 'inventory.update'
+  | 'inventory.low_stock'
+  | 'inventory.check'       // alias for stock.check
+  | 'payment.upi'
+  | 'payment.cash'
+  | 'report.today'
+  | 'report.week'
+  | 'confirm'
+  | 'cancel'
+  | 'help'
+  | 'greeting'
+  | 'fallback';
 
 export interface DialogflowEntity {
-  product?: string;         // Product name
-  quantity?: number;        // Quantity (e.g., 2)
-  unit?: string;            // Unit (kg, litre, piece)
-  price?: number;           // Price
-  amount?: number;          // Amount for payment
+  product?: string;
+  productMl?: string;
+  quantity?: number;
+  unit?: string;
+  price?: number;
+  amount?: number;
+}
+
+/** A single product extracted by CX Playbook */
+export interface CXProduct {
+  name: string;
+  nameMl: string;
+  qty: number;
+  unit: string;
 }
 
 export interface DialogflowResponse {
   intent: DialogflowIntentType;
   confidence: number;
   entities: DialogflowEntity;
-  fulfillmentText: string;  // Response text from Dialogflow
+  products: CXProduct[];
+  fulfillmentText: string;
   rawQuery: string;
 }
 
-interface DialogflowConfig {
-  projectId: string;
-  sessionId: string;
-  languageCode: string;
+// Persistent session ID per browser session (CX tracks conversation context)
+let cxSessionId: string | null = null;
+
+function getSessionId(): string {
+  if (!cxSessionId) {
+    cxSessionId = `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+  return cxSessionId;
 }
 
-// Get config from environment
-function getConfig(): DialogflowConfig | null {
-  const projectId = process.env.NEXT_PUBLIC_DIALOGFLOW_PROJECT_ID;
-
-  if (!projectId) {
-    console.warn('Dialogflow not configured. Set NEXT_PUBLIC_DIALOGFLOW_PROJECT_ID');
-    return null;
-  }
-
-  return {
-    projectId,
-    sessionId: `session-${Date.now()}`,
-    languageCode: 'ml', // Malayalam
-  };
+/** Reset CX session (e.g. after completing a transaction) */
+export function resetCXSession(): void {
+  cxSessionId = null;
 }
 
 /**
- * Detect intent using Dialogflow via Supabase Edge Function
+ * Detect intent using Dialogflow CX Playbook via Supabase Edge Function
  */
 export async function detectIntent(text: string): Promise<DialogflowResponse | null> {
-  const config = getConfig();
-
-  if (!config) {
-    return null;
-  }
-
   if (!isEdgeFunctionsAvailable()) {
-    console.warn('Edge functions not available for Dialogflow');
+    console.warn('Edge functions not available for Dialogflow CX');
     return null;
   }
 
   try {
-    const { data, error } = await callEdgeFunction('dialogflow-detect', {
+    const { data, error } = await callEdgeFunction('dialogflow-cx-detect', {
       text,
-      sessionId: config.sessionId,
-      languageCode: config.languageCode,
+      sessionId: getSessionId(),
+      languageCode: 'en',
     });
 
     if (error || !data) {
-      console.error('Dialogflow Edge Function error:', error);
+      console.error('Dialogflow CX Edge Function error:', error);
       return null;
     }
 
-    // Debug logging - see what Dialogflow returns
-    console.log('[Dialogflow Response]', {
-      queryText: data.queryResult?.queryText,
-      intent: data.queryResult?.intent?.displayName,
-      confidence: data.queryResult?.intentDetectionConfidence,
-      parameters: data.queryResult?.parameters,
-      fulfillmentText: data.queryResult?.fulfillmentText,
-    });
-
-    return parseDialogflowResponse(data, text);
+    console.log('[CX Response]', data);
+    return parseCXResponse(data, text);
   } catch (error) {
-    console.error('Dialogflow detection failed:', error);
+    console.error('Dialogflow CX detection failed:', error);
     return null;
   }
 }
 
 /**
- * Parse Dialogflow API response into our format
+ * Parse structured CX Playbook response into our format
  */
-function parseDialogflowResponse(data: any, rawQuery: string): DialogflowResponse {
-  const queryResult = data.queryResult || {};
-  const intent = queryResult.intent || {};
-  const parameters = queryResult.parameters || {};
+function parseCXResponse(data: any, rawQuery: string): DialogflowResponse {
+  const intent = (data.intent || 'fallback') as DialogflowIntentType;
+  const products: CXProduct[] = data.products || [];
+  const confidence = data.confidence || 0;
+  const response = data.response || '';
 
-  // Map Dialogflow intent name to our type
-  const intentName = intent.displayName || 'fallback';
-  const mappedIntent = mapIntentName(intentName);
-
-  // Extract entities from parameters
-  const entities: DialogflowEntity = {
-    product: parameters.product || parameters['product-name'] || undefined,
-    quantity: parameters.quantity ? parseFloat(parameters.quantity) : undefined,
-    unit: parameters.unit || undefined,
-    price: parameters.price ? parseFloat(parameters.price) : undefined,
-    amount: parameters.amount ? parseFloat(parameters.amount) : undefined,
-  };
+  // Build entities from first product (for backward compat with single-product code)
+  const firstProduct = products[0];
+  const entities: DialogflowEntity = firstProduct
+    ? {
+        product: firstProduct.name,
+        productMl: firstProduct.nameMl,
+        quantity: firstProduct.qty,
+        unit: firstProduct.unit,
+      }
+    : {};
 
   return {
-    intent: mappedIntent,
-    confidence: queryResult.intentDetectionConfidence || 0,
+    intent,
+    confidence,
     entities,
-    fulfillmentText: queryResult.fulfillmentText || '',
+    products,
+    fulfillmentText: response,
     rawQuery,
   };
 }
 
 /**
- * Map Dialogflow intent display name to our intent type
- */
-function mapIntentName(displayName: string): DialogflowIntentType {
-  const mapping: Record<string, DialogflowIntentType> = {
-    // Billing intents
-    'billing.add': 'billing.add',
-    'billing.add_item': 'billing.add',
-    'add_to_bill': 'billing.add',
-    'billing.remove': 'billing.remove',
-    'remove_from_bill': 'billing.remove',
-    'billing.clear': 'billing.clear',
-    'clear_bill': 'billing.clear',
-    'billing.total': 'billing.total',
-    'get_total': 'billing.total',
-    'billing.complete': 'billing.complete',
-
-    // Inventory intents
-    'inventory.add': 'inventory.add',
-    'add_stock': 'inventory.add',
-    'inventory.check': 'inventory.check',
-    'check_stock': 'inventory.check',
-    'inventory.update': 'inventory.update',
-
-    // Payment intents
-    'payment.upi': 'payment.upi',
-    'show_qr': 'payment.upi',
-    'payment.cash': 'payment.cash',
-
-    // Report intents
-    'report.today': 'report.today',
-    'report.week': 'report.week',
-
-    // Navigation
-    'navigation.billing': 'navigation.billing',
-    'navigation.inventory': 'navigation.inventory',
-
-    // General
-    'general.help': 'general.help',
-    'general.greeting': 'general.greeting',
-    'general.cancel': 'general.cancel',
-    'general.confirm': 'general.confirm',
-    'Default Welcome Intent': 'general.greeting',
-    'Default Fallback Intent': 'fallback',
-  };
-
-  return mapping[displayName] || 'fallback';
-}
-
-/**
- * Check if Dialogflow is configured
+ * Check if Dialogflow CX is configured (edge functions available)
  */
 export function isDialogflowConfigured(): boolean {
-  return !!process.env.NEXT_PUBLIC_DIALOGFLOW_PROJECT_ID;
+  return isEdgeFunctionsAvailable();
 }

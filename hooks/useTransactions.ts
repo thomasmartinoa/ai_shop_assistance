@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSupabaseClient } from '@/lib/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export type Period = 'today' | 'week' | 'month';
 
@@ -15,7 +16,32 @@ export interface TopProduct {
     revenue: number;
 }
 
+export interface Transaction {
+    id: string;
+    created_at: string;
+    subtotal: number;
+    gst_amount: number;
+    discount: number;
+    total: number;
+    payment_method: string;
+    payment_status: string;
+    customer_phone: string | null;
+    notes: string | null;
+    items: Array<{
+        product_name?: string;
+        name?: string;
+        name_en?: string;
+        quantity?: number;
+        qty?: number;
+        unit?: string;
+        unit_price?: number;
+        price?: number;
+        total?: number;
+    }>;
+}
+
 export interface UseTransactionsReturn {
+    transactions: Transaction[];
     stats: SalesStats;
     topProducts: TopProduct[];
     isLoading: boolean;
@@ -29,13 +55,13 @@ function getPeriodRange(period: Period): { from: string; to: string } {
 
     let from: Date;
     if (period === 'today') {
-        from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // midnight today
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     } else if (period === 'week') {
         from = new Date(now);
         from.setDate(from.getDate() - 7);
     } else {
         from = new Date(now);
-        from.setDate(1); // first of the month
+        from.setDate(1);
     }
 
     return { from: from.toISOString(), to };
@@ -43,7 +69,11 @@ function getPeriodRange(period: Period): { from: string; to: string } {
 
 const EMPTY_STATS: SalesStats = { sales: 0, orders: 0, avgOrder: 0 };
 
-export function useTransactions(shopId: string | undefined, period: Period): UseTransactionsReturn {
+export function useTransactions(shopId?: string, period?: Period): UseTransactionsReturn {
+    const { shop } = useAuth();
+    const resolvedShopId = shopId ?? shop?.id;
+
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [stats, setStats] = useState<SalesStats>(EMPTY_STATS);
     const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -53,7 +83,7 @@ export function useTransactions(shopId: string | undefined, period: Period): Use
     const refetch = useCallback(() => setTick((t) => t + 1), []);
 
     useEffect(() => {
-        if (!shopId) {
+        if (!resolvedShopId) {
             setIsLoading(false);
             return;
         }
@@ -71,41 +101,48 @@ export function useTransactions(shopId: string | undefined, period: Period): Use
             setError(null);
 
             try {
-                const { from, to } = getPeriodRange(period);
-
-                const { data, error: qErr } = await supabase!
+                let query = supabase!
                     .from('transactions')
-                    .select('total, items')
-                    .eq('shop_id', shopId!)
+                    .select('id, created_at, subtotal, gst_amount, discount, total, items, payment_method, payment_status, customer_phone, notes')
+                    .eq('shop_id', resolvedShopId!)
                     .eq('payment_status', 'completed')
-                    .gte('created_at', from)
-                    .lte('created_at', to);
+                    .order('created_at', { ascending: false });
+
+                if (period) {
+                    const { from, to } = getPeriodRange(period);
+                    query = query.gte('created_at', from).lte('created_at', to);
+                } else {
+                    // Fetch last 365 days when no period specified
+                    const yearAgo = new Date();
+                    yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+                    query = query.gte('created_at', yearAgo.toISOString());
+                }
+
+                const { data, error: qErr } = await query;
 
                 if (qErr) throw new Error(qErr.message);
                 if (cancelled) return;
 
-                const rows = data ?? [];
+                const rows = (data ?? []) as Transaction[];
+                setTransactions(rows);
+
                 const totalSales = rows.reduce((sum, r) => sum + Number(r.total), 0);
                 const orderCount = rows.length;
                 const avgOrder = orderCount > 0 ? totalSales / orderCount : 0;
-
                 setStats({ sales: totalSales, orders: orderCount, avgOrder });
 
                 // Aggregate top products from items JSONB array
                 const productMap = new Map<string, { qty: number; revenue: number }>();
                 for (const row of rows) {
-                    const items = (row.items as Array<{
-                        product_name?: string;
-                        name?: string;
-                        quantity: number;
-                        total: number;
-                    }>) ?? [];
+                    const items = row.items ?? [];
                     for (const item of items) {
                         const name = item.product_name ?? item.name ?? 'Unknown';
+                        const qty = item.quantity ?? item.qty ?? 0;
+                        const revenue = item.total ?? ((item.unit_price ?? item.price ?? 0) * qty);
                         const existing = productMap.get(name) ?? { qty: 0, revenue: 0 };
                         productMap.set(name, {
-                            qty: existing.qty + Number(item.quantity),
-                            revenue: existing.revenue + Number(item.total),
+                            qty: existing.qty + Number(qty),
+                            revenue: existing.revenue + Number(revenue),
                         });
                     }
                 }
@@ -119,6 +156,7 @@ export function useTransactions(shopId: string | undefined, period: Period): Use
             } catch (err) {
                 if (!cancelled) {
                     setError(err instanceof Error ? err.message : 'Failed to load stats');
+                    setTransactions([]);
                     setStats(EMPTY_STATS);
                     setTopProducts([]);
                 }
@@ -129,7 +167,7 @@ export function useTransactions(shopId: string | undefined, period: Period): Use
 
         fetchStats();
         return () => { cancelled = true; };
-    }, [shopId, period, tick]);
+    }, [resolvedShopId, period, tick]);
 
-    return { stats, topProducts, isLoading, error, refetch };
+    return { transactions, stats, topProducts, isLoading, error, refetch };
 }
