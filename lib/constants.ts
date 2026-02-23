@@ -67,6 +67,15 @@ export const INTENT_TYPES = {
   CONFIRM: 'CONFIRM',
   CANCEL: 'CANCEL',
   HELP: 'HELP',
+  // Inventory management
+  INVENTORY_ADD: 'INVENTORY_ADD',       // "50 kg അരി സ്റ്റോക്കിൽ ചേർക്കൂ"
+  INVENTORY_UPDATE: 'INVENTORY_UPDATE', // "അരി വില 60 ആക്കൂ"
+  INVENTORY_CHECK: 'INVENTORY_CHECK',   // "ലോ സ്റ്റോക്ക് ഉൽപ്പന്നങ്ങൾ"
+  // Reports
+  REPORTS_TODAY: 'REPORTS_TODAY',       // "ഇന്നത്തെ സെയിൽ എത്ര?"
+  REPORTS_WEEK: 'REPORTS_WEEK',         // "ഈ ആഴ്ചത്തെ സെയിൽ?"
+  REPORTS_PRODUCT: 'REPORTS_PRODUCT',   // "അരി എത്ര വിറ്റു?"
+  REPORTS_PROFIT: 'REPORTS_PROFIT',     // "ഇന്നത്തെ ലാഭം?"
   UNKNOWN: 'UNKNOWN',
 } as const;
 

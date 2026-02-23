@@ -16,8 +16,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 
 const navigation = [
+  { name: 'Voice Hub', href: '/voice-hub', icon: Mic },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Voice Billing', href: '/billing', icon: Mic },
+  { name: 'Billing', href: '/billing', icon: Mic },
   { name: 'Inventory', href: '/inventory', icon: Package },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },

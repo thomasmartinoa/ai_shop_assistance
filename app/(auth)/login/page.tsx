@@ -23,7 +23,7 @@ export default function LoginPage() {
 
   const handleDemoMode = () => {
     enableDemoMode();
-    router.push('/dashboard');
+    router.push('/voice-hub');
   };
 
   const handleSendOtp = async (e: React.FormEvent) => {
@@ -76,8 +76,8 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
-        // Redirect to onboarding or dashboard
-        router.push('/dashboard');
+        // Redirect to onboarding or voice hub
+        router.push('/voice-hub');
       }
     } catch (err) {
       setError('Failed to verify OTP. Please try again.');

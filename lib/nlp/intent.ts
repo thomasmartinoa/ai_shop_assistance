@@ -168,8 +168,84 @@ const INTENT_PATTERNS: IntentPattern[] = [
     patterns: [
       /(?:സഹായം|help|എന്താണ്\s*ചെയ്യാൻ\s*കഴിയുക)/i,
       /(?:what|how)\s*(?:can|to)\s*(?:you|I)\s*(?:do|use)/i,
+      /എന്തൊക്കെ\s*(?:ചെയ്യാൻ|ചോദിക്കാൻ)\s*(?:പറ്റും|കഴിയും)/i,
     ],
     priority: 1,
+  },
+
+  // Inventory - Add to stock
+  {
+    type: INTENT_TYPES.INVENTORY_ADD,
+    patterns: [
+      /(?:സ്റ്റോക്കിൽ|stock\s*(?:il|il))\s*ചേർക്കൂ/i,
+      /(.+)\s*(?:സ്റ്റോക്ക്)\s*(?:ഇടൂ|ചേർക്കൂ|കൂട്ടൂ)/i,
+      /(?:stock|സ്റ്റോക്ക്)\s*(?:add|ചേർക്കൂ)/i,
+      /(?:stock\s*update|ഇൻവെന്ററി\s*ചേർക്കൂ)/i,
+      /(\d+(?:\.\d+)?)\s*(?:കിലോ|kg|piece|litre|pack)?\s*(.+)\s*(?:stock|സ്റ്റോക്ക്)/i,
+    ],
+    priority: 4,
+  },
+
+  // Inventory - Update price
+  {
+    type: INTENT_TYPES.INVENTORY_UPDATE,
+    patterns: [
+      /(.+)\s*(?:വില|price)\s*(?:\d+)\s*(?:ആക്കൂ|ആക്കുക|set|update)/i,
+      /(?:വില|price)\s*(?:മാറ്റൂ|update|change)/i,
+      /(.+)\s*(?:price|വില)\s*(\d+)/i,
+    ],
+    priority: 3,
+  },
+
+  // Inventory - Low stock check
+  {
+    type: INTENT_TYPES.INVENTORY_CHECK,
+    patterns: [
+      /(?:ലോ\s*സ്റ്റോക്ക്|low\s*stock|കുറഞ്ഞ\s*സ്റ്റോക്ക്)/i,
+      /(?:ഏത്|which)\s*(?:ഉൽപ്പന്നം|products?)\s*(?:കുറഞ്ഞ|low)/i,
+    ],
+    priority: 3,
+  },
+
+  // Reports - Today's sales
+  {
+    type: INTENT_TYPES.REPORTS_TODAY,
+    patterns: [
+      /(?:ഇന്ന്|today)\s*(?:സെയിൽ|sale|sales|വിറ്റ|വരുമാനം|income)/i,
+      /(?:ഇന്നത്തെ)\s*(?:ആകെ|total|തുക|sales)/i,
+      /today\s*(?:sales|total|report)/i,
+    ],
+    priority: 3,
+  },
+
+  // Reports - This week
+  {
+    type: INTENT_TYPES.REPORTS_WEEK,
+    patterns: [
+      /(?:ഈ\s*ആഴ്ച|this\s*week)\s*(?:സെയിൽ|sales|total)/i,
+      /(?:weekly|ആഴ്ചത്തെ)\s*(?:report|sales|സെയിൽ)/i,
+    ],
+    priority: 3,
+  },
+
+  // Reports - Product-specific sales
+  {
+    type: INTENT_TYPES.REPORTS_PRODUCT,
+    patterns: [
+      /(.+)\s*(?:എത്ര|how\s*much)\s*(?:വിറ്റ|sold|sales)/i,
+      /(?:how\s*much)\s*(.+)\s*(?:sold|sold\s*today)/i,
+    ],
+    priority: 3,
+  },
+
+  // Reports - Profit
+  {
+    type: INTENT_TYPES.REPORTS_PROFIT,
+    patterns: [
+      /(?:ലാഭം|profit|earnings?)\s*(?:ഇന്ന്|today|ഈ\s*ആഴ്ച|this\s*week)?/i,
+      /(?:ഇന്നത്തെ|today'?s?)\s*(?:ലാഭം|profit)/i,
+    ],
+    priority: 3,
   },
 ];
 

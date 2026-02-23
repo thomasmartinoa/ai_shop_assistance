@@ -10,49 +10,11 @@
  */
 
 import type { DialogflowIntentType, DialogflowEntity } from './dialogflow';
+import { KERALA_PRODUCTS, PRODUCT_ALIAS_MAP } from '@/lib/data/products';
 
-// Product name normalization - handles common speech recognition errors
-const PRODUCT_VARIATIONS: Record<string, string[]> = {
-  'Rice': [
-    'അരി', 'ari', 'rice', 'റൈസ്', 'arroz', 'ary', 'ari yum', 'അരിയും',
-    'ari ye', 'aari', 'aary', 'ariyum', 'നെല്ല്', 'rice um'
-  ],
-  'Sugar': [
-    'പഞ്ചസാര', 'panjasara', 'sugar', 'ഷുഗർ', 'pancha sara', 'panchara',
-    'പഞ്ചസരം', 'shughar', 'sugar um', 'panja sara', 'പഞ്ചസാരം'
-  ],
-  'Coconut Oil': [
-    'വെളിച്ചെണ്ണ', 'velichenna', 'coconut oil', 'കോക്കനട്ട് ഓയിൽ',
-    'velichennu', 'vellachenna', 'oil', 'enna', 'എണ്ണ'
-  ],
-  'Tea Powder': [
-    'ചായപ്പൊടി', 'chayappodi', 'tea powder', 'tea', 'ടീ', 'chaya',
-    'ചായ', 'chayapodi', 'tea podi', 'ചായപ്പൊടി യും'
-  ],
-  'Milk': [
-    'പാൽ', 'paal', 'milk', 'മിൽക്ക്', 'pal', 'palu', 'പാല്',
-    'milk um', 'പാലും'
-  ],
-  'Wheat Flour': [
-    'ഗോതമ്പ്', 'gothambu', 'wheat flour', 'wheat', 'ഗോതമ്പു പൊടി',
-    'atta', 'ആട്ട', 'gothampum', 'goa thambu'
-  ],
-  'Salt': [
-    'ഉപ്പ്', 'uppu', 'salt', 'സാൾട്ട്', 'uppum', 'ഉപ്പും',
-    'salt um', 'uppoo'
-  ],
-  'Soap': [
-    'സോപ്പ്', 'soap', 'സോപ്', 'സോപ്പും', 'soppu', 'soapum'
-  ],
-};
-
-// Build reverse lookup map for fast matching
-const PRODUCT_NAME_MAP = new Map<string, string>();
-for (const [productName, variations] of Object.entries(PRODUCT_VARIATIONS)) {
-  for (const variant of variations) {
-    PRODUCT_NAME_MAP.set(variant.toLowerCase(), productName);
-  }
-}
+// Product name reverse lookup: alias → canonical English name
+// Built from the full 100-product catalog
+const PRODUCT_NAME_MAP = PRODUCT_ALIAS_MAP;
 
 // Malayalam number words to digits with more variations
 const NUMBER_WORDS: Record<string, number> = {
@@ -220,8 +182,14 @@ const INTENT_MATCHERS: IntentMatcher[] = [
     patterns: [
       // Number + unit + product patterns
       /(\d+(?:\.\d+)?)\s*(?:കിലോ|kg|കിലൊ|litre|ലിറ്റർ|piece|എണ്ണം|gram|ഗ്രാം)?\s+/i,
-      // Product + number patterns
-      /(?:അരി|പഞ്ചസാര|വെളിച്ചെണ്ണ|ചായപ്പൊടി|പാൽ|ഗോതമ്പ്|ഉപ്പ്|സോപ്പ്|rice|sugar|oil|tea|milk|wheat|salt|soap)/i,
+      // Any product name from catalog (built dynamically)
+      new RegExp(
+        Array.from(KERALA_PRODUCTS.flatMap(p => [p.name_ml, ...p.aliases.slice(0, 3)]))
+          .filter(Boolean)
+          .map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('|'),
+        'i'
+      ),
     ],
     keywords: ['add', 'ചേർക്കുക', 'ചേർക്കൂ', 'കൂട്ടുക', 'ചേർത്തൂ', 'എടുത്തൂ', 'വേണം'],
     confidence: 0.9,
