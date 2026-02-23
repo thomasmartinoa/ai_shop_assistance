@@ -5,7 +5,7 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import { useVoice } from '@/hooks/useVoice';
 import { useSmartNLP } from '@/lib/nlp/useSmartNLP';
 import { routeIntent } from '@/lib/nlp/intent-router';
-import { useProducts } from '@/hooks/useProducts';
+import { useSharedProducts } from '@/contexts/ProductsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils';
@@ -17,7 +17,7 @@ export default function VoiceHubPage() {
   const { shop, isDemoMode } = useAuth();
   const { state, transcript, interimTranscript, toggleListening, speak } = useVoice();
   const { processText, isProcessing } = useSmartNLP();
-  const { findProduct, updateStock, loadProducts } = useProducts({ shopId: shop?.id });
+  const { findProduct, updateStock, loadProducts } = useSharedProducts();
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);

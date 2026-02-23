@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProducts } from '@/hooks/useProducts';
+import { useSharedProducts } from '@/contexts/ProductsContext';
 import { formatCurrency } from '@/lib/utils';
 import { PRODUCT_CATEGORIES, UNIT_TYPES } from '@/lib/constants';
 import { toast } from '@/components/shared/Toast';
@@ -49,7 +49,7 @@ export default function InventoryPage() {
   const {
     products, isLoading, getLowStockProducts,
     addProduct, updateProduct, deleteProduct,
-  } = useProducts({ shopId: shop?.id });
+  } = useSharedProducts();
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');

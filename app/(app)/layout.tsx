@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { ProductsProvider } from '@/contexts/ProductsContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { BottomTabs } from '@/components/layout/BottomTabs';
@@ -40,15 +41,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-0">
-        <AppHeader />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 bg-page pb-20 lg:pb-6">
-          {children}
-        </main>
-        <BottomTabs />
+    <ProductsProvider>
+      <div className="flex h-screen">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-h-screen lg:ml-0">
+          <AppHeader />
+          <main className="flex-1 overflow-y-auto p-4 lg:p-6 bg-page pb-20 lg:pb-6">
+            {children}
+          </main>
+          <BottomTabs />
+        </div>
       </div>
-    </div>
+    </ProductsProvider>
   );
 }
