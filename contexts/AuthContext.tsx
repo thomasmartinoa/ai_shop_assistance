@@ -101,50 +101,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize auth state
   useEffect(() => {
-    const initAuth = async () => {
-      // If Supabase is not configured, just stop loading
-      // Don't auto-enable demo mode - let user click "Get Started" first
-      if (!isSupabaseConfigured) {
-        console.log('Supabase not configured, demo mode available');
-        setIsLoading(false);
-        return;
-      }
+    if (!isSupabaseConfigured || !supabase) {
+      console.log('[Auth] Supabase not configured, demo mode available');
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        const { data: { session } } = await supabase!.auth.getSession();
+    console.log('[Auth] Initializing auth...');
+    console.log('[Auth] Current URL:', typeof window !== 'undefined' ? window.location.href : 'SSR');
+
+    // Listen for auth changes — the Supabase client auto-handles ?code= and #access_token=
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('[Auth] onAuthStateChange:', event, session ? 'has session' : 'no session');
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
           await fetchShop(session.user.id);
+        } else {
+          setShop(null);
         }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
         setIsLoading(false);
       }
-    };
+    );
 
-    initAuth();
+    // Get the current session (waits for client init including code exchange)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('[Auth] getSession result:', session ? 'has session' : 'no session');
+      if (session) {
+        setSession(session);
+        setUser(session.user);
+        await fetchShop(session.user.id);
+      }
+      setIsLoading(false);
+    }).catch((err) => {
+      console.error('[Auth] getSession error:', err);
+      setIsLoading(false);
+    });
 
-    // Listen for auth changes only if Supabase is configured
-    if (isSupabaseConfigured && supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          setSession(session);
-          setUser(session?.user ?? null);
-
-          if (session?.user) {
-            await fetchShop(session.user.id);
-          } else {
-            setShop(null);
-          }
-        }
-      );
-
-      return () => subscription.unsubscribe();
-    }
-  }, [supabase, fetchShop, isSupabaseConfigured, enableDemoMode]);
+    return () => subscription.unsubscribe();
+  }, [supabase, fetchShop, isSupabaseConfigured]);
 
   // Sign in with Google OAuth
   const signInWithGoogle = async () => {

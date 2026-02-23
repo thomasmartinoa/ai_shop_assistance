@@ -1,4 +1,4 @@
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -25,25 +25,33 @@ function isSupabaseConfigured(): boolean {
   return true;
 }
 
+// Singleton client instance
+let client: SupabaseClient<Database> | null = null;
+
 /**
- * Create a Supabase client for browser use
+ * Create a Supabase client for browser use.
+ * Uses implicit OAuth flow (tokens in URL hash) — ideal for static exports.
  */
-export function createClient() {
-  // Return null if credentials are missing or placeholder (demo mode)
+export function createClient(): SupabaseClient<Database> | null {
   if (!isSupabaseConfigured()) {
-    console.warn('Supabase not configured or using placeholder values. Running in demo mode.');
     return null;
   }
 
-  return createBrowserClient<Database>(supabaseUrl!, supabaseAnonKey!);
+  // Return singleton — prevents re-creating client on every render
+  if (client) return client;
+
+  client = createSupabaseClient<Database>(supabaseUrl!, supabaseAnonKey!, {
+    auth: {
+      flowType: 'implicit',
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
+  });
+
+  return client;
 }
 
-// Export a singleton instance for convenience
-let client: ReturnType<typeof createClient> | null = null;
-
-export function getSupabaseClient() {
-  if (!client) {
-    client = createClient();
-  }
-  return client;
+export function getSupabaseClient(): SupabaseClient<Database> | null {
+  return createClient();
 }

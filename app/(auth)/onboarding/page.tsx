@@ -52,7 +52,7 @@ export default function OnboardingPage() {
     setIsLoading(true);
     try {
       const { error: dbError } = await supabase!.from('shops').insert({
-        owner_id: user?.id,
+        owner_id: user!.id,
         name: shopData.name.trim(),
         name_ml: shopData.name_ml.trim() || null,
         address: shopData.address.trim() || null,
@@ -75,7 +75,7 @@ export default function OnboardingPage() {
       const { data: shopRow } = await supabase!
         .from('shops')
         .select('id')
-        .eq('owner_id', user?.id)
+        .eq('owner_id', user!.id)
         .single();
 
       const validProducts = products.filter(p => p.name_en.trim() && p.price);
