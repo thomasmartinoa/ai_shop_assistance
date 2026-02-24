@@ -19,6 +19,7 @@ export type DialogflowIntentType =
   | 'payment.cash'
   | 'report.today'
   | 'report.week'
+  | 'report.profit'
   | 'confirm'
   | 'cancel'
   | 'help'

@@ -28,7 +28,29 @@ export interface NLPResult {
 }
 
 /**
- * Ultra-light local fallback — only 3 intents (no product matching)
+ * Normalize Malayalam STT output — maps Malayalam transliterations of
+ * common English words back to recognizable forms so NLP can detect them.
+ * ml-IN STT outputs "യുപിഐ" when user says "UPI", "ക്യാഷ്" for "cash", etc.
+ */
+const ML_TO_ENGLISH: [RegExp, string][] = [
+  [/യു\s*പി\s*ഐ|യുപിഐ|യു\.പി\.ഐ/gi, 'UPI'],
+  [/ജി\s*പേ|ഗൂഗിൾ\s*പേ/gi, 'GPay'],
+  [/ക്യാഷ്|ക്യാഷ|കാഷ്|കാശ്/gi, 'cash'],
+  [/ഫോൺ\s*പേ|ഫോണ്‍പേ/gi, 'PhonePe'],
+  [/ബിൽ\s*ഇറ്റ്|ബില്ലിറ്റ്/gi, 'bill it'],
+  [/ക്യു\s*ആർ/gi, 'QR'],
+];
+
+function normalizeTranscript(text: string): string {
+  let normalized = text;
+  for (const [pattern, replacement] of ML_TO_ENGLISH) {
+    normalized = normalized.replace(pattern, replacement);
+  }
+  return normalized;
+}
+
+/**
+ * Ultra-light local fallback — only basic intents (no product matching)
  */
 function detectLocalFallback(text: string): NLPResult {
   const t = text.trim().toLowerCase();
@@ -41,6 +63,15 @@ function detectLocalFallback(text: string): NLPResult {
   }
   if (/^(ഹലോ|നമസ്കാരം|hi|hello)$/i.test(t)) {
     return { intent: 'greeting', confidence: 0.9, entities: {}, products: [], source: 'local', rawQuery: text, fulfillmentText: 'നമസ്കാരം! എന്ത് സഹായം വേണം?' };
+  }
+  if (/upi|gpay|phonep|ക്യു\s*ആർ/i.test(t)) {
+    return { intent: 'payment.upi', confidence: 0.9, entities: {}, products: [], source: 'local', rawQuery: text, fulfillmentText: 'UPI പേയ്മെന്റ്' };
+  }
+  if (/\bcash\b|രൊക്കം|പണം/i.test(t) && !/stock|report/i.test(t)) {
+    return { intent: 'payment.cash', confidence: 0.9, entities: {}, products: [], source: 'local', rawQuery: text, fulfillmentText: 'ക്യാഷ് പേയ്മെന്റ്' };
+  }
+  if (/\bbill\s*it\b|ബിൽ\s*ചെയ്യൂ|ബിൽ\s*അടിക്കൂ|അത്ര\s*മതി|ഇത്ര\s*മതി|വേറെ\s*ഒന്നും\s*വേണ്ട/i.test(t)) {
+    return { intent: 'billing.complete', confidence: 0.9, entities: {}, products: [], source: 'local', rawQuery: text, fulfillmentText: 'ബിൽ ചെയ്യുന്നു' };
   }
 
   return { intent: 'fallback', confidence: 0, entities: {}, products: [], source: 'local', rawQuery: text, fulfillmentText: 'മനസ്സിലായില്ല. വീണ്ടും പറയൂ.' };
@@ -59,14 +90,16 @@ export function useSmartNLP() {
       return { intent: 'fallback', confidence: 0, entities: {}, products: [], source: 'local', rawQuery: text };
     }
 
-    console.log('🧠 CX NLP: Processing:', text);
+    // Normalize Malayalam transliterations of English words before NLP
+    const normalized = normalizeTranscript(text);
+    console.log('🧠 CX NLP: Processing:', text, normalized !== text ? `→ normalized: ${normalized}` : '');
     setIsProcessing(true);
     setError(null);
 
     try {
-      // Try CX Playbook
+      // Try CX Playbook with normalized text
       if (isDialogflowConfigured()) {
-        const cxResult = await detectIntent(text);
+        const cxResult = await detectIntent(normalized);
 
         if (cxResult) {
           const result: NLPResult = {
@@ -86,8 +119,8 @@ export function useSmartNLP() {
         }
       }
 
-      // Ultra-light local fallback
-      const localResult = detectLocalFallback(text);
+      // Ultra-light local fallback (uses normalized text)
+      const localResult = detectLocalFallback(normalized);
       setLastResult(localResult);
       setIsProcessing(false);
       return localResult;
@@ -95,7 +128,7 @@ export function useSmartNLP() {
       console.error('🧠 CX NLP error:', err);
       setError(err instanceof Error ? err.message : 'NLP processing failed');
 
-      const localResult = detectLocalFallback(text);
+      const localResult = detectLocalFallback(normalized);
       setLastResult(localResult);
       setIsProcessing(false);
       return localResult;

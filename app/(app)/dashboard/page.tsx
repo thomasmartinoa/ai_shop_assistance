@@ -2,7 +2,7 @@
 
 import { DollarSign, ShoppingBag, Package, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProducts } from '@/hooks/useProducts';
+import { useSharedProducts } from '@/contexts/ProductsContext';
 import { useTransactions } from '@/hooks/useTransactions';
 import { formatCurrency } from '@/lib/utils';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -23,7 +23,7 @@ function SkeletonCard() {
 
 export default function DashboardPage() {
   const { shop } = useAuth();
-  const { products, getLowStockProducts, isLoading: productsLoading } = useProducts({ shopId: shop?.id });
+  const { products, getLowStockProducts, isLoading: productsLoading } = useSharedProducts();
   const { stats, topProducts, transactions, isLoading: statsLoading } = useTransactions(shop?.id, 'today');
 
   const lowStock = getLowStockProducts();

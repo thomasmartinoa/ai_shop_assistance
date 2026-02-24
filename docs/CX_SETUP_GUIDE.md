@@ -33,6 +33,7 @@ Paste this into the **Instructions** field:
 
 ```
 - The shopkeeper speaks in Malayalam (മലയാളം) or sometimes transliterated Malayalam in English script
+- IMPORTANT: Speech-to-text uses ml-IN locale, so English words get transliterated to Malayalam script. Examples: "UPI" → "യുപിഐ", "GPay" → "ജി പേ", "cash" → "ക്യാഷ്", "bill" → "ബിൽ", "cancel" → "ക്യാൻസൽ". Recognize these transliterations as their English equivalents.
 - Parse ALL products mentioned in a single utterance — shopkeepers often say multiple items at once
 - Common Kerala grocery products: അരി(rice), പഞ്ചസാര(sugar), ഗോതമ്പ്(wheat), വെളിച്ചെണ്ണ(coconut oil), ചായപ്പൊടി(tea powder), പാൽ(milk), സോപ്പ്(soap), ഉപ്പ്(salt), മുളക്(chilli), മഞ്ഞൾ(turmeric), മല്ലി(coriander), ജീരകം(cumin), കടല(chickpea), പരിപ്പ്(dal), റവ(rava), മൈദ(maida), ബിസ്ക്കറ്റ്(biscuit), ഡിറ്റർജന്റ്(detergent), ടൂത്ത്പേസ്റ്റ്(toothpaste), ഷാമ്പൂ(shampoo), തൈര്(curd), വെണ്ണ(butter), ഉള്ളി(onion), വെളുത്തുള്ളി(garlic), ഇഞ്ചി(ginger), കുരുമുളക്(pepper), ഏലം(cardamom), കറുവപ്പട്ട(cinnamon)
 - Default quantity is 1 if not specified
@@ -42,10 +43,11 @@ Paste this into the **Instructions** field:
 - For inventory.add: extract product name and quantity to add to stock
 - For report.today/report.week: no products needed
 - For billing.total or billing.complete: no products needed, user wants to see the total or finish
-- For payment.upi: user wants to show QR code (keywords: QR, GPay, PhonePe, UPI)
-- For payment.cash: user wants cash payment
-- For confirm: user says ശരി, ഉവ്വ്, ഓക്കേ, yes, ok
-- For cancel: user says വേണ്ട, ക്യാൻസൽ, no, cancel
+- For payment.upi: user wants to show QR code (keywords: QR, GPay, PhonePe, UPI). Malayalam STT outputs these as: യുപിഐ, യു പി ഐ, ജിപേ, ജി പേ, ഗൂഗിൾ പേ, ഫോൺ പേ, ഫോണ്‍പേ, ക്യു ആർ
+- For payment.cash: user wants cash payment (keywords: cash, ക്യാഷ്, കാഷ്, കാശ്, പണം, രൊക്കം)
+- For confirm: user says ശരി, ഉവ്വ്, ഓക്കേ, yes, ok, ഓക്കെ
+- For cancel: user says വേണ്ട, ക്യാൻസൽ, no, cancel, അത്ര മതി, ഇത്ര മതി, വേറെ ഒന്നും വേണ്ട
+- For billing.complete: user says bill it, ബിൽ ഇറ്റ്, ബില്ലിറ്റ്, ബിൽ ചെയ്യൂ, ബിൽ അടിക്കൂ
 - For help: user asks what you can do
 - For greeting: user says ഹലോ, നമസ്കാരം, hi
 - Malayalam response should be concise (1-2 sentences max)
@@ -139,6 +141,62 @@ Add each of these as a separate example in the **Examples** tab.
 **Agent:**
 ```
 {"intent":"help","products":[],"response":"ബില്ലിംഗ്, സ്റ്റോക്ക് ചെക്ക്, ഇൻവെൻ്ററി, റിപ്പോർട്ട് — എല്ലാം ചെയ്യാം","confidence":0.9}
+```
+
+---
+
+### Example 7: UPI payment (Malayalam transliteration)
+
+**User:**
+```
+യുപിഐ
+```
+
+**Agent:**
+```
+{"intent":"payment.upi","products":[],"response":"UPI QR കോഡ് കാണിക്കുന്നു","confidence":0.95}
+```
+
+---
+
+### Example 8: Cash payment (Malayalam transliteration)
+
+**User:**
+```
+ക്യാഷ്
+```
+
+**Agent:**
+```
+{"intent":"payment.cash","products":[],"response":"ക്യാഷ് പേയ്മെന്റ്","confidence":0.95}
+```
+
+---
+
+### Example 9: Bill it / finalize
+
+**User:**
+```
+ബിൽ ചെയ്യൂ
+```
+
+**Agent:**
+```
+{"intent":"billing.complete","products":[],"response":"ബിൽ ചെയ്യുന്നു","confidence":0.95}
+```
+
+---
+
+### Example 10: That's it / nothing else
+
+**User:**
+```
+അത്ര മതി
+```
+
+**Agent:**
+```
+{"intent":"cancel","products":[],"response":"ശരി, ബിൽ ക്ലോസ് ചെയ്യുന്നു","confidence":0.95}
 ```
 
 ---
