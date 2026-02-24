@@ -28,6 +28,31 @@ type BillingPhase =
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+/** Convert requested unit to product's base unit for correct price calculation */
+function normalizeQuantity(qty: number, requestedUnit: string, baseUnit: string) {
+  const ru = requestedUnit.toLowerCase();
+  const bu = baseUnit.toLowerCase();
+
+  // g → kg: 250g rice (priced per kg) → display 250g, calc 0.25 kg
+  if (ru === 'g' && bu === 'kg') {
+    return { displayQty: qty, displayUnit: 'g', calcQty: qty / 1000 };
+  }
+  // ml → litre: 500ml oil (priced per litre) → display 500ml, calc 0.5 litre
+  if (ru === 'ml' && bu === 'litre') {
+    return { displayQty: qty, displayUnit: 'ml', calcQty: qty / 1000 };
+  }
+  // kg → g (unlikely but handle): 2kg sugar (priced per g)
+  if (ru === 'kg' && bu === 'g') {
+    return { displayQty: qty, displayUnit: 'kg', calcQty: qty * 1000 };
+  }
+  // litre → ml
+  if (ru === 'litre' && bu === 'ml') {
+    return { displayQty: qty, displayUnit: 'litre', calcQty: qty * 1000 };
+  }
+  // Same unit or no conversion needed
+  return { displayQty: qty, displayUnit: ru, calcQty: qty };
+}
+
 async function fetchSalesStats(shopId: string, period: 'today' | 'week') {
   const supabase = getSupabaseClient();
   if (!supabase) return null;
@@ -224,13 +249,17 @@ export default function VoiceHubPage() {
     for (const p of nlpResult.products) {
       const found = findProduct(p.name) || findProduct(p.nameMl);
       if (found) {
+        const requestedUnit = p.unit || found.unit || 'piece';
+        const baseUnit = found.unit || 'piece';
+        // Convert qty to base unit for price calculation
+        const { displayQty, displayUnit, calcQty } = normalizeQuantity(p.qty, requestedUnit, baseUnit);
         newItems.push({
           name: found.name_en,
           nameMl: found.name_ml,
-          qty: p.qty,
-          unit: p.unit || found.unit || 'piece',
+          qty: displayQty,
+          unit: displayUnit,
           price: found.price,
-          total: found.price * p.qty,
+          total: found.price * calcQty,
         });
       } else {
         notFound.push(p.name || p.nameMl);
