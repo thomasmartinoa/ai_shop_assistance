@@ -129,9 +129,9 @@ export const STOCK = {
   out: (productMl: string) =>
     `ക്ഷമിക്കണം, ${productMl} സ്റ്റോക്കിൽ ഇല്ല`,
 
-  /** Location: "അരി A1 ഷെൽഫിൽ ഉണ്ട്" */
+  /** Location: "അരി ഫ്ലോർ ചാക്കിൽ ഉണ്ട്" */
   location: (productMl: string, location: string) =>
-    `${productMl} ${location} ഷെൽഫിൽ ഉണ്ട്`,
+    `${productMl} ${location} ഉണ്ട്`,
 
   /** Multiple low stock: "5 ഉൽപ്പന്നങ്ങൾ കുറഞ്ഞ സ്റ്റോക്കിൽ ഉണ്ട്" */
   multiple_low: (count: number) =>

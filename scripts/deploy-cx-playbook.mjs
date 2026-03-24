@@ -167,7 +167,7 @@ Extract ALL products from one utterance. Shopkeepers say multiple items in one b
 - billing.total: ടോട്ടൽ, ആകെ, എത്ര ആയി
 - billing.complete: ബിൽ ചെയ്യൂ, അത്ര മതി, ഇത്ര മതി, വേറെ ഒന്നും വേണ്ട, bill it
 - stock.check: എത്ര ഉണ്ട്, സ്റ്റോക്ക് എത്ര, ഉണ്ടോ
-- stock.location: എവിടെ, ഏത് ഷെൽഫ്
+- stock.location: {product} + (എവിടെ | ഏത് ഷെൽഫ് | ഏത് ഷെൽഫിൽ | എവിടെ കിട്ടും | എവിടെ വെച്ചിരിക്കുന്നു | where is)
 - inventory.add: സ്റ്റോക്കിൽ ചേർക്കൂ (differentiator: "സ്റ്റോക്കിൽ" keyword)
 - inventory.update: വില + amount (വില മാറ്റൂ, വില ആക്കൂ)
 - inventory.low_stock: കുറഞ്ഞ സ്റ്റോക്ക്, തീരാറായി
@@ -183,7 +183,7 @@ Extract ALL products from one utterance. Shopkeepers say multiple items in one b
 
 ## DISAMBIGUATION
 - "{product}" alone → billing.add | "{product} ഉണ്ടോ" → stock.check | "{product} സ്റ്റോക്കിൽ ചേർക്കൂ" → inventory.add
-- "{product} വേണ്ട" → billing.remove | "{product} എവിടെ" → stock.location
+- "{product} വേണ്ട" → billing.remove | "{product} എവിടെ/ഏത് ഷെൽഫ്/where is" → stock.location (NOT stock.check)
 - "അത്ര മതി" → billing.complete (NOT cancel)
 
 ## RESPONSE STYLE
@@ -206,7 +206,13 @@ const EXAMPLES = [
   { name: 'Finalize nothing else', user: 'വേറെ ഒന്നും വേണ്ട', agent: '{"intent":"billing.complete","products":[],"response":"ശരി, ബിൽ ഫൈനൽ ചെയ്യുന്നു","confidence":0.95}' },
   { name: 'Stock check', user: 'അരി എത്ര ഉണ്ട്', agent: '{"intent":"stock.check","products":[{"name":"Rice","nameMl":"അരി","qty":0,"unit":"kg"}],"response":"അരി സ്റ്റോക്ക് നോക്കുന്നു","confidence":0.95}' },
   { name: 'Stock availability', user: 'സോപ്പ് ഉണ്ടോ', agent: '{"intent":"stock.check","products":[{"name":"Soap","nameMl":"സോപ്പ്","qty":0,"unit":"piece"}],"response":"സോപ്പ് നോക്കുന്നു","confidence":0.95}' },
-  { name: 'Product location', user: 'മഞ്ഞൾ എവിടെ ഉണ്ട്', agent: '{"intent":"stock.location","products":[{"name":"Turmeric","nameMl":"മഞ്ഞൾ","qty":0,"unit":"kg"}],"response":"മഞ്ഞൾ നോക്കുന്നു","confidence":0.95}' },
+  { name: 'Product location turmeric', user: 'മഞ്ഞൾ എവിടെ ഉണ്ട്', agent: '{"intent":"stock.location","products":[{"name":"Turmeric","nameMl":"മഞ്ഞൾ","qty":0,"unit":"kg"}],"response":"മഞ്ഞൾ എവിടെ ഉണ്ടെന്ന് നോക്കുന്നു","confidence":0.95}' },
+  { name: 'Product location rice', user: 'അരി എവിടെ', agent: '{"intent":"stock.location","products":[{"name":"Rice","nameMl":"അരി","qty":0,"unit":"kg"}],"response":"അരി എവിടെ ഉണ്ടെന്ന് നോക്കുന്നു","confidence":0.95}' },
+  { name: 'Product location soap shelf', user: 'സോപ്പ് ഏത് ഷെൽഫിൽ ഉണ്ട്', agent: '{"intent":"stock.location","products":[{"name":"Soap","nameMl":"സോപ്പ്","qty":0,"unit":"piece"}],"response":"സോപ്പ് ഏത് ഷെൽഫിൽ എന്ന് നോക്കുന്നു","confidence":0.95}' },
+  { name: 'Product location oil which shelf', user: 'വെളിച്ചെണ്ണ ഏത് ഷെൽഫ്', agent: '{"intent":"stock.location","products":[{"name":"Coconut Oil","nameMl":"വെളിച്ചെണ്ണ","qty":0,"unit":"litre"}],"response":"വെളിച്ചെണ്ണ ഏത് ഷെൽഫ് എന്ന് നോക്കുന്നു","confidence":0.95}' },
+  { name: 'Product location sugar English', user: 'where is sugar', agent: '{"intent":"stock.location","products":[{"name":"Sugar","nameMl":"പഞ്ചസാര","qty":0,"unit":"kg"}],"response":"പഞ്ചസാര എവിടെ ഉണ്ടെന്ന് നോക്കുന്നു","confidence":0.95}' },
+  { name: 'Product location onion where placed', user: 'ഉള്ളി എവിടെ വെച്ചിരിക്കുന്നു', agent: '{"intent":"stock.location","products":[{"name":"Onion","nameMl":"ഉള്ളി","qty":0,"unit":"kg"}],"response":"ഉള്ളി എവിടെ ഉണ്ടെന്ന് നോക്കുന്നു","confidence":0.95}' },
+  { name: 'Product location salt find', user: 'ഉപ്പ് എവിടെ കിട്ടും', agent: '{"intent":"stock.location","products":[{"name":"Salt","nameMl":"ഉപ്പ്","qty":0,"unit":"kg"}],"response":"ഉപ്പ് എവിടെ ഉണ്ടെന്ന് നോക്കുന്നു","confidence":0.95}' },
   { name: 'Add stock', user: '50 കിലോ അരി സ്റ്റോക്കിൽ ചേർക്കൂ', agent: '{"intent":"inventory.add","products":[{"name":"Rice","nameMl":"അരി","qty":50,"unit":"kg"}],"response":"50 കിലോ അരി സ്റ്റോക്കിൽ ചേർക്കുന്നു","confidence":0.95}' },
   { name: 'Update price', user: 'അരി വില 65 രൂപ ആക്കൂ', agent: '{"intent":"inventory.update","products":[{"name":"Rice","nameMl":"അരി","qty":0,"unit":"kg"}],"response":"അരി വില 65 രൂപ ആക്കുന്നു","confidence":0.95}' },
   { name: 'Low stock check', user: 'ഏത് സാധനങ്ങൾ തീരാറായി', agent: '{"intent":"inventory.low_stock","products":[],"response":"കുറഞ്ഞ സ്റ്റോക്ക് നോക്കുന്നു","confidence":0.95}' },

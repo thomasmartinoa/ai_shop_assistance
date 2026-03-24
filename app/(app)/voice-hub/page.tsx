@@ -13,6 +13,7 @@ import { formatCurrency } from '@/lib/utils';
 import { VoiceMicButton } from '@/components/voice/VoiceMicButton';
 import { ConversationLog, type ConversationMessage } from '@/components/voice/ConversationLog';
 import { LiveCart, type CartItem } from '@/components/voice/LiveCart';
+import { PaymentSuccessOverlay } from '@/components/billing/PaymentSuccessOverlay';
 import { BILLING, PAYMENT, STOCK, INVENTORY, REPORTS, SYSTEM, toMalayalamUnit } from '@/lib/voice/responses-ml';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -104,6 +105,7 @@ export default function VoiceHubPage() {
   const [showCart, setShowCart] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [billingPhase, setBillingPhase] = useState<BillingPhase>('idle');
+  const [paymentSuccess, setPaymentSuccess] = useState<{ amount: number; method: 'cash' | 'upi' } | null>(null);
 
   // ─── Refs (for timer callbacks to access latest values) ───────────────────
   const lastProcessedRef = useRef('');
@@ -231,6 +233,7 @@ export default function VoiceHubPage() {
       ? PAYMENT.upi_received(totalRounded)
       : PAYMENT.cash_received(totalRounded);
 
+    setPaymentSuccess({ amount: totalRounded, method: paymentMethod });
     setCart([]);
     setPhase('idle');
     clearAllTimers();
@@ -678,6 +681,13 @@ export default function VoiceHubPage() {
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-4rem)] p-4 lg:p-6">
+      {paymentSuccess && (
+        <PaymentSuccessOverlay
+          amount={paymentSuccess.amount}
+          paymentMethod={paymentSuccess.method}
+          onDismiss={() => setPaymentSuccess(null)}
+        />
+      )}
       {/* ─── Left: Voice Panel ─────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0">
         {/* Mic */}

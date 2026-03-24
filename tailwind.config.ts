@@ -92,11 +92,28 @@ const config: Config = {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        'pop-in': {
+          '0%': { opacity: '0', transform: 'scale(0.3)' },
+          '60%': { opacity: '1', transform: 'scale(1.15)' },
+          '80%': { transform: 'scale(0.95)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        'float-up': {
+          '0%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+          '100%': { opacity: '0', transform: 'translateY(-80px) scale(0.5)' },
+        },
+        'overlay-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
       },
       animation: {
         'pulse-ring': 'pulse-ring 1.5s ease-in-out infinite',
         'voice-wave': 'voice-wave 0.5s ease-in-out infinite',
         'fade-in': 'fade-in 0.3s ease-out',
+        'pop-in': 'pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+        'float-up': 'float-up 1.2s ease-out forwards',
+        'overlay-in': 'overlay-in 0.2s ease-out forwards',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],

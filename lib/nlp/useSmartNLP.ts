@@ -73,6 +73,12 @@ function detectLocalFallback(text: string): NLPResult {
   if (/\bbill\s*it\b|ബിൽ\s*ചെയ്യൂ|ബിൽ\s*അടിക്കൂ|അത്ര\s*മതി|ഇത്ര\s*മതി|വേറെ\s*ഒന്നും\s*വേണ്ട/i.test(t)) {
     return { intent: 'billing.complete', confidence: 0.9, entities: {}, products: [], source: 'local', rawQuery: text, fulfillmentText: 'ബിൽ ചെയ്യുന്നു' };
   }
+  // Location queries: "X evide", "X ethe shelf", "where is X"
+  const locationMatch = t.match(/^(.+?)\s+(എവിടെ|എവ്വിടെ|ഏത്\s*ഷെൽഫ്|ഏത്\s*shelf|where\s+is|evide)/i);
+  if (locationMatch) {
+    const product = locationMatch[1].trim();
+    return { intent: 'stock.location', confidence: 0.8, entities: { product }, products: [], source: 'local', rawQuery: text, fulfillmentText: `${product} എവിടെ ഉണ്ടെന്ന് നോക്കുന്നു` };
+  }
 
   return { intent: 'fallback', confidence: 0, entities: {}, products: [], source: 'local', rawQuery: text, fulfillmentText: 'മനസ്സിലായില്ല. വീണ്ടും പറയൂ.' };
 }

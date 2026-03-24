@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import {
   Plus, Search, Pencil, Trash2, Package, AlertTriangle, XCircle,
-  LayoutGrid, List, Loader2,
+  LayoutGrid, List, Loader2, MapPin,
 } from 'lucide-react';
 import type { Product } from '@/types/database';
 
@@ -37,11 +37,13 @@ interface ProductFormData {
   unit: string;
   category: string;
   gst_rate: string;
+  shelf_location: string;
 }
 
 const emptyForm: ProductFormData = {
   name_en: '', name_ml: '', price: '', cost_price: '',
   stock: '0', min_stock: '5', unit: 'piece', category: 'grocery', gst_rate: '0',
+  shelf_location: '',
 };
 
 export default function InventoryPage() {
@@ -96,6 +98,7 @@ export default function InventoryPage() {
       unit: p.unit || 'piece',
       category: p.category || 'other',
       gst_rate: String(p.gst_rate || 0),
+      shelf_location: p.shelf_location || '',
     });
     setDialogOpen(true);
   }, []);
@@ -124,6 +127,7 @@ export default function InventoryPage() {
         unit: form.unit,
         category: form.category,
         gst_rate: parseFloat(form.gst_rate) || 0,
+        shelf_location: form.shelf_location.trim() || null,
       };
 
       if (editingProduct) {
@@ -134,7 +138,7 @@ export default function InventoryPage() {
         const { error } = await addProduct({
           ...payload,
           shop_id: shop?.id || 'demo-shop-id',
-          aliases: null, shelf_location: null, barcode: null,
+          aliases: null, barcode: null,
           image_url: null, is_active: true,
         });
         if (error) throw error;
@@ -298,6 +302,12 @@ export default function InventoryPage() {
               </div>
               <p className="text-lg font-bold text-orange-600">{formatCurrency(p.price)}</p>
               <StockIndicator product={p} />
+              {p.shelf_location && (
+                <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <MapPin className="h-3 w-3" />
+                  {p.shelf_location}
+                </span>
+              )}
               <div className="flex gap-2 pt-1">
                 <Button variant="ghost" size="sm" onClick={() => openEdit(p)} className="h-8 px-2.5 text-gray-500">
                   <Pencil className="h-3.5 w-3.5" />
@@ -321,6 +331,7 @@ export default function InventoryPage() {
                   <TableHead className="text-right">Price</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead>Unit</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
@@ -337,6 +348,16 @@ export default function InventoryPage() {
                       <StockIndicator product={p} />
                     </TableCell>
                     <TableCell>{p.unit}</TableCell>
+                    <TableCell>
+                      {p.shelf_location ? (
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <MapPin className="h-3 w-3" />
+                          {p.shelf_location}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-[10px]">
                         {PRODUCT_CATEGORIES.find((c) => c.id === p.category)?.name || p.category || 'Other'}
@@ -416,9 +437,19 @@ export default function InventoryPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-2 space-y-2">
+            <div className="space-y-2">
               <Label htmlFor="gst_rate">GST Rate (%)</Label>
               <Input id="gst_rate" type="number" min="0" max="28" step="0.01" value={form.gst_rate} onChange={(e) => updateField('gst_rate', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="shelf_location">Shelf Location</Label>
+              <Input
+                id="shelf_location"
+                placeholder="e.g. A1, Aisle 2 Shelf 3"
+                value={form.shelf_location}
+                onChange={(e) => updateField('shelf_location', e.target.value)}
+              />
+              <p className="text-[11px] text-gray-400">Used for voice: "where is [item]?"</p>
             </div>
           </div>
           <DialogFooter>
