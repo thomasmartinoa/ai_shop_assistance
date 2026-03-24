@@ -1,0 +1,358 @@
+# Codebase Structure
+
+**Analysis Date:** 2026-03-24
+
+## Directory Layout
+
+```
+ai_shop_assistance/
+├── app/                         # Next.js App Router pages and layouts
+│   ├── layout.tsx              # Root layout (Providers wrapper)
+│   ├── page.tsx                # Landing page (auth redirect)
+│   ├── providers.tsx           # Client-side provider composition
+│   ├── globals.css             # CSS variables, Tailwind base, scrollbar styles
+│   ├── (auth)/                 # Unauthenticated route group
+│   │   ├── login/page.tsx      # Google OAuth + Demo Mode login
+│   │   └── onboarding/page.tsx # 3-step shop setup wizard
+│   └── (app)/                  # Authenticated route group (with nav shell)
+│       ├── layout.tsx          # Auth guard + ProductsProvider + nav shell
+│       ├── dashboard/page.tsx  # Dashboard with stats, charts, alerts
+│       ├── voice-hub/page.tsx  # Voice billing (main feature, ~780 lines)
+│       ├── billing/page.tsx    # Sales history table
+│       ├── inventory/page.tsx  # Product CRUD (grid/list views)
+│       ├── reports/page.tsx    # Analytics with Recharts
+│       └── settings/page.tsx   # Shop settings + account
+│
+├── components/                  # Reusable UI components
+│   ├── ui/                     # shadcn/ui primitives (14 components)
+│   │   ├── avatar.tsx
+│   │   ├── badge.tsx
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   ├── dialog.tsx
+│   │   ├── dropdown-menu.tsx
+│   │   ├── input.tsx
+│   │   ├── label.tsx
+│   │   ├── progress.tsx
+│   │   ├── select.tsx
+│   │   ├── separator.tsx
+│   │   ├── sheet.tsx
+│   │   ├── table.tsx
+│   │   ├── tabs.tsx
+│   │   └── tooltip.tsx
+│   ├── voice/                  # Voice interaction components
+│   │   ├── VoiceMicButton.tsx  # Animated mic button with state indicators
+│   │   ├── ConversationLog.tsx # Chat-style message display
+│   │   └── LiveCart.tsx        # Real-time cart sidebar/panel
+│   ├── billing/                # Billing-specific components
+│   │   └── PaymentSuccessOverlay.tsx  # Animated payment confirmation
+│   ├── dashboard/              # Dashboard widgets
+│   │   ├── StatCard.tsx        # Metric display card with icon
+│   │   ├── RevenueChart.tsx    # Area chart (Recharts, fetches own data)
+│   │   ├── LowStockAlert.tsx   # Low stock product list
+│   │   ├── RecentTransactions.tsx  # Recent sales table
+│   │   └── TopProducts.tsx     # Top selling products list
+│   ├── layout/                 # Navigation and structural components
+│   │   ├── Sidebar.tsx         # Desktop sidebar (hidden on mobile)
+│   │   ├── BottomTabs.tsx      # Mobile bottom navigation
+│   │   └── AppHeader.tsx       # Mobile top header with user menu
+│   └── shared/                 # Cross-cutting UI
+│       └── Toast.tsx           # Toast notification system (global singleton)
+│
+├── contexts/                    # React Context providers
+│   ├── AuthContext.tsx          # Auth state, shop data, Google OAuth, demo mode
+│   └── ProductsContext.tsx      # Shared products state wrapper
+│
+├── hooks/                       # Custom React hooks
+│   ├── useVoice.ts             # Speech recognition + TTS with fallback chain
+│   ├── useProducts.ts          # Product CRUD, fuzzy search, demo mode
+│   └── useTransactions.ts      # Transaction queries with period filtering
+│
+├── lib/                         # Core utilities and business logic
+│   ├── supabase/               # Database client
+│   │   ├── client.ts           # Supabase singleton (returns null if not configured)
+│   │   └── edge-functions.ts   # Generic Edge Function caller with auth
+│   ├── nlp/                    # Natural Language Processing
+│   │   ├── dialogflow.ts       # Dialogflow CX client (via Edge Function)
+│   │   ├── useSmartNLP.ts      # NLP hook (CX primary, local fallback)
+│   │   └── intent-router.ts    # Intent-to-action mapping + voice response builder
+│   ├── voice/                  # Voice response library
+│   │   └── responses-ml.ts     # Malayalam response templates (BILLING, STOCK, etc.)
+│   ├── data/                   # Static data
+│   │   └── products.ts         # ~100 Kerala product definitions with aliases
+│   ├── constants.ts            # App constants (voice settings, GST rates, categories)
+│   └── utils.ts                # Utilities (cn, formatCurrency, formatDate, etc.)
+│
+├── types/                       # TypeScript type definitions
+│   └── database.ts             # Supabase schema types (Shop, Product, Transaction)
+│
+├── supabase/                    # Supabase project files
+│   └── migrations/
+│       ├── 001_initial_schema.sql  # Tables, indexes, RLS policies, triggers
+│       └── 002_update_prices_march2026.sql  # Price updates
+│
+├── public/                      # Static assets
+│   ├── manifest.json           # PWA manifest
+│   └── icons/                  # App icons
+│
+├── out/                         # Static export output (generated by `next build`)
+│
+├── scripts/                     # Utility scripts
+│
+├── lock/                        # Service account key (gitignored)
+│
+├── CLAUDE.md                    # AI context document (project reference)
+├── README.md                    # User documentation
+├── prd.md                       # Product requirements
+├── package.json                 # Dependencies and scripts
+├── package-lock.json            # Dependency lock file
+├── tsconfig.json                # TypeScript config
+├── next.config.js               # Next.js config (static export)
+├── tailwind.config.ts           # Tailwind CSS config with custom theme
+├── postcss.config.js            # PostCSS config (autoprefixer)
+├── components.json              # shadcn/ui configuration
+├── .env.local.example           # Environment variables template
+└── .gitignore                   # Git ignore rules
+```
+
+## Directory Purposes
+
+**`app/`:**
+- Purpose: Next.js App Router pages, layouts, and route definitions
+- Contains: Page components (`page.tsx`), layout components (`layout.tsx`), client provider composition
+- Key files: `app/providers.tsx` (root provider tree), `app/(app)/layout.tsx` (auth guard + nav shell), `app/(app)/voice-hub/page.tsx` (core voice billing feature)
+
+**`components/ui/`:**
+- Purpose: shadcn/ui primitive components (installed via `npx shadcn-ui@latest add`)
+- Contains: 14 Radix UI-based components styled with Tailwind + CVA
+- Key files: `button.tsx`, `card.tsx`, `dialog.tsx`, `select.tsx`, `table.tsx`, `tabs.tsx`
+- Note: Do not manually edit these. Use `npx shadcn-ui@latest add <component>` to add new ones.
+
+**`components/voice/`:**
+- Purpose: Voice interaction UI components specific to the Voice Hub
+- Contains: Mic button with animated state indicators, chat-style conversation log, live cart display
+- Key files: `VoiceMicButton.tsx` (state-driven icon + pulse animation), `LiveCart.tsx` (cart with actions)
+
+**`components/dashboard/`:**
+- Purpose: Dashboard page widgets
+- Contains: Stat cards, revenue chart (self-fetching), low stock alerts, recent transactions, top products
+- Key files: `RevenueChart.tsx` (fetches its own data from Supabase), `StatCard.tsx` (reusable metric card)
+
+**`components/layout/`:**
+- Purpose: App shell navigation components
+- Contains: Desktop sidebar, mobile bottom tabs, mobile header
+- Key files: `Sidebar.tsx` (6 nav items), `BottomTabs.tsx` (4 tabs + "More" overflow)
+
+**`contexts/`:**
+- Purpose: React Context providers for global state
+- Contains: Auth state management (user, session, shop, demo mode) and shared products state
+- Key files: `AuthContext.tsx` (211 lines, handles OAuth, demo mode, shop fetching)
+
+**`hooks/`:**
+- Purpose: Custom hooks encapsulating business logic and data fetching
+- Contains: Voice I/O, product CRUD with fuzzy search, transaction queries
+- Key files: `useVoice.ts` (537 lines, full STT/TTS implementation), `useProducts.ts` (326 lines, CRUD + search)
+
+**`lib/nlp/`:**
+- Purpose: Voice command understanding pipeline
+- Contains: Dialogflow CX client, smart NLP hook with fallback, intent-to-action router
+- Key files: `intent-router.ts` (maps 30+ intents to operations with Malayalam voice responses)
+
+**`lib/supabase/`:**
+- Purpose: Database client and Edge Function utilities
+- Contains: Singleton Supabase client with configuration validation, generic Edge Function caller
+- Key files: `client.ts` (returns `null` if Supabase not configured), `edge-functions.ts` (auto-injects auth tokens, retries on 401)
+
+**`lib/data/`:**
+- Purpose: Static product catalog for demo mode
+- Contains: ~100 Kerala grocery products with Malayalam names, aliases, pricing, and shelf locations
+- Key files: `products.ts` (comprehensive product definitions)
+
+**`types/`:**
+- Purpose: TypeScript type definitions for database schema
+- Contains: `Database` interface matching Supabase schema, helper types (`Shop`, `Product`, `Transaction`, etc.)
+- Key files: `database.ts` (manually maintained, mirrors Supabase schema)
+
+**`supabase/migrations/`:**
+- Purpose: SQL migration files for database schema
+- Contains: Table creation, indexes, RLS policies, triggers
+- Key files: `001_initial_schema.sql` (full schema with 3 tables, 8 indexes, 4 RLS policies)
+
+## Key File Locations
+
+**Entry Points:**
+- `app/layout.tsx`: Root layout, wraps everything in `<Providers>`
+- `app/page.tsx`: Landing page, auth-based redirect dispatcher
+- `app/providers.tsx`: Composes `AuthProvider` + `ToastProvider`
+- `app/(app)/layout.tsx`: Auth guard, `ProductsProvider`, nav shell
+
+**Configuration:**
+- `next.config.js`: Static export, trailing slashes, unoptimized images
+- `tsconfig.json`: Path alias `@/*` -> `./*`, strict mode, bundler resolution
+- `tailwind.config.ts`: Custom colors (page, surface, sidebar, stat), animations, Inter font
+- `components.json`: shadcn/ui config (default style, RSC true, path aliases)
+- `postcss.config.js`: Tailwind + autoprefixer
+- `.env.local.example`: Template for `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+**Core Logic:**
+- `app/(app)/voice-hub/page.tsx`: Voice billing state machine (~780 lines)
+- `hooks/useVoice.ts`: Full STT/TTS implementation with fallback chain (537 lines)
+- `lib/nlp/useSmartNLP.ts`: NLP processing hook (CX + local fallback)
+- `lib/nlp/intent-router.ts`: Intent-to-action mapping with 30+ operations
+- `hooks/useProducts.ts`: Product CRUD with fuzzy search algorithm
+- `contexts/AuthContext.tsx`: Auth state management with demo mode
+- `lib/supabase/edge-functions.ts`: Edge Function caller with token injection
+
+**Static Data:**
+- `lib/data/products.ts`: ~100 Kerala products (demo data)
+- `lib/voice/responses-ml.ts`: Malayalam response templates
+- `lib/constants.ts`: Voice settings, GST rates, categories, unit types
+
+**Testing:**
+- No test files exist. No test framework configured.
+
+**Database:**
+- `supabase/migrations/001_initial_schema.sql`: Full schema DDL
+- `supabase/migrations/002_update_prices_march2026.sql`: Price update migration
+- `types/database.ts`: TypeScript types matching schema
+
+## Naming Conventions
+
+**Files:**
+- Components: `PascalCase.tsx` (e.g., `VoiceMicButton.tsx`, `LiveCart.tsx`, `StatCard.tsx`)
+- Hooks: `useCamelCase.ts` (e.g., `useVoice.ts`, `useProducts.ts`, `useTransactions.ts`)
+- Utilities/Libraries: `camelCase.ts` or `kebab-case.ts` (e.g., `client.ts`, `edge-functions.ts`, `intent-router.ts`, `responses-ml.ts`)
+- Types: `camelCase.ts` (e.g., `database.ts`)
+- Pages: `page.tsx` (Next.js convention)
+- Layouts: `layout.tsx` (Next.js convention)
+
+**Directories:**
+- Route groups: `(groupName)` (e.g., `(auth)`, `(app)`)
+- Feature modules: `kebab-case` (e.g., `voice-hub`)
+- Component groups: `camelCase` or `kebab-case` (e.g., `ui`, `voice`, `billing`, `dashboard`)
+
+## Import Patterns
+
+**Path Aliases:**
+- `@/*` maps to project root (e.g., `@/components/ui/button`, `@/hooks/useVoice`, `@/lib/utils`)
+
+**Import Order (observed pattern):**
+1. React/Next.js imports (`import { useState } from 'react'`, `import { useRouter } from 'next/navigation'`)
+2. Third-party imports (`import QRCode from 'qrcode'`, `import { Mic } from 'lucide-react'`)
+3. Internal imports via `@/` alias:
+   - Contexts (`@/contexts/AuthContext`)
+   - Hooks (`@/hooks/useVoice`)
+   - Lib modules (`@/lib/utils`, `@/lib/nlp/...`, `@/lib/supabase/...`)
+   - Components (`@/components/ui/...`, `@/components/voice/...`)
+   - Types (`@/types/database`)
+
+**Barrel Exports:** Not used. Each file imports directly from its source path. No `index.ts` barrel files.
+
+**`'use client'` Directive:** Present at the top of every component, hook, and context file. Required because the app is fully client-rendered (static export).
+
+## Where to Add New Code
+
+**New Page/Route:**
+- Create directory under `app/(app)/` for authenticated pages or `app/(auth)/` for unauthenticated
+- Add `page.tsx` with `'use client'` directive
+- Add navigation entry in `components/layout/Sidebar.tsx` (desktop) and `components/layout/BottomTabs.tsx` (mobile)
+- Route is auto-prefetched in `app/(app)/layout.tsx` (add to the `routes` array)
+
+**New UI Component:**
+- shadcn/ui primitive: Run `npx shadcn-ui@latest add <component>` -> auto-created in `components/ui/`
+- Feature component: Create in appropriate subdirectory under `components/` (e.g., `components/billing/NewComponent.tsx`)
+- Shared/cross-cutting: Create in `components/shared/`
+
+**New Hook:**
+- Create `hooks/useNewHook.ts` with `'use client'` directive
+- Follow existing pattern: export a function that returns an object with state and methods
+- If it needs Supabase, import `createClient` or `getSupabaseClient` from `@/lib/supabase/client`
+- Add demo mode branch if the hook accesses database
+
+**New NLP Intent:**
+1. Add intent type to `DialogflowIntentType` union in `lib/nlp/dialogflow.ts`
+2. Add intent-to-operation mapping in `INTENT_TO_OPERATION` in `lib/nlp/intent-router.ts`
+3. Add operation handler in `modeForOperation()` in `lib/nlp/intent-router.ts`
+4. Add voice response in `buildVoiceResponse()` in `lib/nlp/intent-router.ts`
+5. Add Malayalam response template in `lib/voice/responses-ml.ts`
+6. Handle the operation in `VoiceHubPage.handleTranscript()` or `handleNonBillingOp()`
+
+**New Product Category:**
+- Add to `PRODUCT_CATEGORIES` in `lib/constants.ts`
+- Add products to `KERALA_PRODUCTS` in `lib/data/products.ts`
+
+**New Context Provider:**
+- Create in `contexts/NewContext.tsx`
+- Add to provider tree in `app/providers.tsx` (global) or `app/(app)/layout.tsx` (app-scoped)
+
+**Utilities:**
+- General helpers: Add to `lib/utils.ts`
+- Domain-specific helpers: Create new file in `lib/` (e.g., `lib/billing/gst.ts`)
+
+**Database Changes:**
+- Create new migration file: `supabase/migrations/NNN_description.sql`
+- Update TypeScript types: `types/database.ts`
+- Update relevant hooks to query/mutate new data
+
+## Special Directories
+
+**`out/`:**
+- Purpose: Static export output generated by `next build`
+- Generated: Yes (by `next build` with `output: 'export'`)
+- Committed: Yes (currently committed, but should typically be gitignored)
+- Contains: HTML, JS, CSS chunks for all routes, ready for Cloudflare Pages deployment
+
+**`.next/`:**
+- Purpose: Next.js build cache
+- Generated: Yes (by `next dev` and `next build`)
+- Committed: No (gitignored)
+
+**`node_modules/`:**
+- Purpose: npm dependencies
+- Generated: Yes (by `npm install`)
+- Committed: No (gitignored)
+
+**`.claude/` and `.copilot/`:**
+- Purpose: AI assistant skill definitions for Claude and GitHub Copilot
+- Generated: No (manually created)
+- Committed: Yes
+- Contains: Skill files organized by feature (auth-flow, billing-flow, voice-test, etc.)
+
+**`lock/`:**
+- Purpose: Service account key file for Google auth
+- Generated: No (manually placed)
+- Committed: Appears committed but should be gitignored (contains sensitive credentials)
+
+**`public/`:**
+- Purpose: Static assets served at root path
+- Generated: No
+- Committed: Yes
+- Contains: PWA manifest, app icons
+
+**`scripts/`:**
+- Purpose: Utility/helper scripts
+- Generated: No
+- Committed: Yes
+
+## Build & Deploy
+
+**Build Commands:**
+```bash
+npm run dev          # Development server (next dev)
+npm run build        # Production build + static export to out/
+npm run lint         # ESLint
+npm run type-check   # TypeScript type checking (tsc --noEmit)
+```
+
+**Build Output:**
+- Static HTML/JS/CSS in `out/` directory
+- Deploy `out/` directory to Cloudflare Pages
+- No server required (fully static)
+
+**Key Configuration:**
+- `next.config.js`: `output: 'export'`, `trailingSlash: true`, `images: { unoptimized: true }`
+- All pages are client-rendered; no SSR or ISR
+
+---
+
+*Structure analysis: 2026-03-24*
